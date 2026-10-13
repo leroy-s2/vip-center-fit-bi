@@ -43,7 +43,9 @@ No son 3 datamarts aislados: es **un DW** cuyos 3 datamarts (estrellas) comparte
 | `dm_atencion` | Recepción | FactReclamos, FactRetenciones |
 | `dim` (compartido) | — | DimFecha, DimCliente, DimEmpleado, DimPlan, DimPromocion |
 
-Las FK físicas hecho → dimensión están declaradas en el motor; `docs/ERD.md` es la vista UML.
+Las FK físicas hecho → dimensión están declaradas en el motor; `docs/ERD.md` es la vista UML
+de la constelación completa, y `docs/ERD_dm_*.md` la de cada data mart por separado
+(`npm run uml:entrenamiento|comercial|atencion`).
 
 Sobre el modelo, `sql/05_metricas_datamart.sql` publica **13 vistas** `dbo.DM_*` con las
 métricas/indicadores/KPIs.

@@ -1,11 +1,11 @@
 # ERD — Esquema BI_VIP_CENTER_FIT
 
 > Generado automáticamente por `scripts/erd.mjs` desde `prisma/schema.prisma`.
-> Modelos: 13. `PK` = clave primaria, `UK` = clave única.
+> Modelos: 17. `PK` = clave primaria, `UK` = clave única.
 >
 > **Arquitectura: Data Warehouse en constelación.** El modelo tiene 3 data mart por área
 > de negocio, cada uno una **estrella**, que **comparten las dimensiones conformadas** del
-> esquema `dim`. Las relaciones provienen de las **FOREIGN KEY** declaradas en el DW.
+> Las relaciones provienen de las **FOREIGN KEY** declaradas en el DW.
 
 ## Vista general (constelación)
 
@@ -132,6 +132,7 @@ erDiagram
     string estado
     datetime fecha_resolucion
     int dias_resolucion
+    boolean resuelto_en_mostrador
   }
   FactRenovaciones {
     bigint sk_renovacion PK
@@ -157,6 +158,47 @@ erDiagram
     decimal descuento_aplicado
     decimal precio_lista
     string metodo_pago
+  }
+  etl_control {
+    string proceso PK
+    bigint ultimo_staging_id
+    datetime ultima_carga
+    bigint filas_ultima_carga
+  }
+  FactEvaluacionesProgramadas {
+    bigint sk_evaluacion_programada PK
+    int id_evaluacion_programada_bk UK
+    int sk_fecha_programada
+    int sk_cliente
+    int sk_empleado
+    int id_objetivo_bk
+    string tipo_evaluacion
+    string estado_evaluacion
+    int id_evaluacion_bk
+  }
+  FactRetenciones {
+    bigint sk_retencion PK
+    int id_retencion_bk UK
+    int sk_fecha_retencion
+    int sk_cliente
+    int sk_empleado
+    int id_membresia_bk
+    string canal
+    string motivo
+    string resultado
+    decimal monto_oferta
+  }
+  FactSesionesProgramadas {
+    bigint sk_sesion_programada PK
+    int id_sesion_bk UK
+    int sk_fecha_programada
+    int sk_cliente
+    int sk_plan
+    int sk_empleado
+    string tipo_sesion
+    int hora_programada
+    string estado_sesion
+    int duracion_minutos
   }
   FactAsistencias }o--|| DimCliente : "sk_cliente"
   FactAsistencias }o--|| DimEmpleado : "sk_empleado"
@@ -187,6 +229,16 @@ erDiagram
   FactVentas }o--|| DimFecha : "sk_fecha_pago"
   FactVentas }o--|| DimPlan : "sk_plan"
   FactVentas }o--|| DimPromocion : "sk_promocion"
+  FactEvaluacionesProgramadas }o--|| DimCliente : "sk_cliente"
+  FactEvaluacionesProgramadas }o--|| DimEmpleado : "sk_empleado"
+  FactEvaluacionesProgramadas }o--|| DimFecha : "sk_fecha_programada"
+  FactRetenciones }o--|| DimCliente : "sk_cliente"
+  FactRetenciones }o--|| DimEmpleado : "sk_empleado"
+  FactRetenciones }o--|| DimFecha : "sk_fecha_retencion"
+  FactSesionesProgramadas }o--|| DimCliente : "sk_cliente"
+  FactSesionesProgramadas }o--|| DimEmpleado : "sk_empleado"
+  FactSesionesProgramadas }o--|| DimFecha : "sk_fecha_programada"
+  FactSesionesProgramadas }o--|| DimPlan : "sk_plan"
 ```
 
 ## Data Mart: Atención y reclamos
@@ -205,6 +257,19 @@ erDiagram
     string estado
     datetime fecha_resolucion
     int dias_resolucion
+    boolean resuelto_en_mostrador
+  }
+  FactRetenciones {
+    bigint sk_retencion PK
+    int id_retencion_bk UK
+    int sk_fecha_retencion
+    int sk_cliente
+    int sk_empleado
+    int id_membresia_bk
+    string canal
+    string motivo
+    string resultado
+    decimal monto_oferta
   }
   DimCliente {
     int sk_cliente PK
@@ -244,6 +309,9 @@ erDiagram
   FactReclamos }o--|| DimCliente : "sk_cliente"
   FactReclamos }o--|| DimEmpleado : "sk_empleado"
   FactReclamos }o--|| DimFecha : "sk_fecha_reclamo"
+  FactRetenciones }o--|| DimCliente : "sk_cliente"
+  FactRetenciones }o--|| DimEmpleado : "sk_empleado"
+  FactRetenciones }o--|| DimFecha : "sk_fecha_retencion"
 ```
 
 ## Data Mart: Comercial — ventas y membresías
@@ -413,6 +481,29 @@ erDiagram
     string unidad_medida
     string estado
   }
+  FactEvaluacionesProgramadas {
+    bigint sk_evaluacion_programada PK
+    int id_evaluacion_programada_bk UK
+    int sk_fecha_programada
+    int sk_cliente
+    int sk_empleado
+    int id_objetivo_bk
+    string tipo_evaluacion
+    string estado_evaluacion
+    int id_evaluacion_bk
+  }
+  FactSesionesProgramadas {
+    bigint sk_sesion_programada PK
+    int id_sesion_bk UK
+    int sk_fecha_programada
+    int sk_cliente
+    int sk_plan
+    int sk_empleado
+    string tipo_sesion
+    int hora_programada
+    string estado_sesion
+    int duracion_minutos
+  }
   DimCliente {
     int sk_cliente PK
     int sk_cliente_origen
@@ -466,6 +557,13 @@ erDiagram
   FactEvaluaciones }o--|| DimFecha : "sk_fecha_evaluacion"
   FactObjetivos }o--|| DimCliente : "sk_cliente"
   FactObjetivos }o--|| DimFecha : "sk_fecha_inicio"
+  FactEvaluacionesProgramadas }o--|| DimCliente : "sk_cliente"
+  FactEvaluacionesProgramadas }o--|| DimEmpleado : "sk_empleado"
+  FactEvaluacionesProgramadas }o--|| DimFecha : "sk_fecha_programada"
+  FactSesionesProgramadas }o--|| DimCliente : "sk_cliente"
+  FactSesionesProgramadas }o--|| DimEmpleado : "sk_empleado"
+  FactSesionesProgramadas }o--|| DimFecha : "sk_fecha_programada"
+  FactSesionesProgramadas }o--|| DimPlan : "sk_plan"
 ```
 
 ## Matriz bus (hecho → dimensiones conformadas)
@@ -473,6 +571,7 @@ erDiagram
 | Data mart | Hecho | Dimensiones |
 | --- | --- | --- |
 | Atención y reclamos | FactReclamos | DimCliente, DimEmpleado, DimFecha |
+| Atención y reclamos | FactRetenciones | DimCliente, DimEmpleado, DimFecha |
 | Comercial — ventas y membresías | FactAvisos | DimCliente, DimEmpleado, DimFecha |
 | Comercial — ventas y membresías | FactMembresias | DimCliente, DimEmpleado, DimFecha, DimPlan, DimPromocion |
 | Comercial — ventas y membresías | FactRenovaciones | DimCliente, DimEmpleado, DimFecha |
@@ -480,4 +579,6 @@ erDiagram
 | Entrenamiento | FactAsistencias | DimCliente, DimEmpleado, DimFecha, DimPlan |
 | Entrenamiento | FactEvaluaciones | DimCliente, DimEmpleado, DimFecha |
 | Entrenamiento | FactObjetivos | DimCliente, DimFecha |
+| Entrenamiento | FactEvaluacionesProgramadas | DimCliente, DimEmpleado, DimFecha |
+| Entrenamiento | FactSesionesProgramadas | DimCliente, DimEmpleado, DimFecha, DimPlan |
 

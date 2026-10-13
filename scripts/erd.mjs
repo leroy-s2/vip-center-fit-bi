@@ -25,15 +25,19 @@
 // Uso:  node scripts/erd.mjs
 // ==============================================================================
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import internals from '@prisma/internals';
 
 const { getDMMF } = internals;
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const schemaPath = resolve(root, 'prisma/schema.prisma');
-const outPath = resolve(root, 'docs/ERD.md');
+
+// Uso:
+//   node scripts/erd.mjs                                  -> esquema completo (constelación)
+//   node scripts/erd.mjs <schema.prisma> <salida.md>      -> un data mart puntual
+const schemaPath = resolve(root, process.argv[2] ?? 'prisma/schema.prisma');
+const outPath = resolve(root, process.argv[3] ?? 'docs/ERD.md');
 
 const schema = readFileSync(schemaPath, 'utf8');
 const dmmf = await getDMMF({ datamodel: schema });
@@ -156,36 +160,46 @@ const hasRealFk = models.some((m) =>
   ),
 );
 
+const singleMart = martSchemas.length === 1 ? martSchemas[0] : null;
+const schemaRel = relative(root, schemaPath);
+const allDims = dims.map((d) => d.model);
+
 const out = [];
-out.push('# ERD — Esquema BI_VIP_CENTER_FIT');
+out.push(singleMart ? `# ERD — Data Mart: ${singleMart}` : '# ERD — Esquema BI_VIP_CENTER_FIT');
 out.push('');
-out.push('> Generado automáticamente por `scripts/erd.mjs` desde `prisma/schema.prisma`.');
+out.push(`> Generado automáticamente por \`scripts/erd.mjs\` desde \`${schemaRel}\`.`);
 out.push(`> Modelos: ${models.length}. \`PK\` = clave primaria, \`UK\` = clave única.`);
 out.push('>');
-out.push('> **Arquitectura: Data Warehouse en constelación.** El modelo tiene 3 data mart por área');
-out.push('> de negocio, cada uno una **estrella**, que **comparten las dimensiones conformadas** del');
+if (singleMart) {
+  out.push(`> **Data Mart \`${singleMart}\`**: una **estrella** (sus hechos) más las`);
+  out.push('> **dimensiones conformadas** del esquema `dim` que comparte con el resto de la constelación.');
+} else {
+  out.push('> **Arquitectura: Data Warehouse en constelación.** El modelo tiene 3 data mart por área');
+  out.push('> de negocio, cada uno una **estrella**, que **comparten las dimensiones conformadas** del');
+}
 out.push(
   hasRealFk
-    ? '> esquema `dim`. Las relaciones provienen de las **FOREIGN KEY** declaradas en el DW.'
-    : '> esquema `dim`. Las relaciones se infieren por convención `sk_*` (la base no define FK).',
+    ? '> Las relaciones provienen de las **FOREIGN KEY** declaradas en el DW.'
+    : '> Las relaciones se infieren por convención `sk_*` (la base no define FK).',
 );
 out.push('');
 
-// 1. Constelación completa
-const allEdges = models.flatMap((m) => edgesOf(m));
-out.push('## Vista general (constelación)');
-out.push('');
-out.push(renderDiagram(models.map((m) => m.name), allEdges));
-out.push('');
+// 1. Constelación completa (solo en el esquema completo).
+if (!singleMart) {
+  const allEdges = models.flatMap((m) => edgesOf(m));
+  out.push('## Vista general (constelación)');
+  out.push('');
+  out.push(renderDiagram(models.map((m) => m.name), allEdges));
+  out.push('');
+}
 
-// 2. Una estrella por data mart
-const allDims = dims.map((d) => d.model);
+// 2. Una estrella por data mart (o la única, si el esquema es de un mart).
 for (const s of martSchemas) {
   const label = MART_LABELS[s] ?? s;
   const factNames = factsBySchema[s];
   const edges = factNames.flatMap((n) => edgesOf(models.find((m) => m.name === n)));
   const dimsUsed = allDims.filter((d) => edges.some((e) => e.to === d));
-  out.push(`## Data Mart: ${label}`);
+  out.push(`## ${singleMart ? 'Estrella' : 'Data Mart'}: ${label}`);
   out.push('');
   out.push(`\`esquema: ${s}\``);
   out.push('');
@@ -193,7 +207,7 @@ for (const s of martSchemas) {
   out.push('');
 }
 
-// 3. Matriz bus (hecho -> dimensiones conformadas)
+// 3. Matriz bus (hecho -> dimensiones conformadas).
 out.push('## Matriz bus (hecho → dimensiones conformadas)');
 out.push('');
 out.push(`| Data mart | Hecho | Dimensiones |`);

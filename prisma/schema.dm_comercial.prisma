@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+  schemas  = ["dim", "dm_comercial"]
+}
+
+model DimCliente {
+  sk_cliente            Int                @id(map: "PK__DimClien__78CB69CC2D0A9BFA") @default(autoincrement())
+  sk_cliente_origen     Int?
+  id_cliente_bk         Int                @unique(map: "UQ__DimClien__C039A18CE7620A06")
+  dni                   String?            @db.VarChar(8)
+  nombre_completo       String             @db.VarChar(250)
+  sexo                  String             @db.Char(1)
+  rango_etario          String?            @db.VarChar(50)
+  estado_cliente        String             @db.VarChar(30)
+  fecha_registro_origen DateTime?          @db.Date
+  fecha_inicio_validez  DateTime?          @db.Date
+  fecha_fin_validez     DateTime?          @db.Date
+  es_actual             Boolean
+  FactAvisos            FactAvisos[]
+  FactMembresias        FactMembresias[]
+  FactRenovaciones      FactRenovaciones[]
+  FactVentas            FactVentas[]
+
+  @@schema("dim")
+}
+
+model DimEmpleado {
+  sk_empleado        Int                @id(map: "PK__DimEmple__FED8200F528EF1C3") @default(autoincrement())
+  sk_empleado_origen Int?
+  id_empleado_bk     Int                @unique(map: "UQ__DimEmple__57309A2980CC7A8E")
+  dni                String?            @db.VarChar(20)
+  nombre_completo    String             @db.VarChar(250)
+  cargo              String             @db.VarChar(60)
+  area               String             @db.VarChar(60)
+  FactAvisos         FactAvisos[]
+  FactMembresias     FactMembresias[]
+  FactRenovaciones   FactRenovaciones[]
+  FactVentas         FactVentas[]
+
+  @@schema("dim")
+}
+
+model DimFecha {
+  sk_fecha                                                Int                @id(map: "PK__DimFecha__18FB76FFED5E26D7")
+  fecha                                                   DateTime           @unique(map: "UQ__DimFecha__E114132289E169C1") @db.Date
+  anio                                                    Int
+  trimestre                                               Int
+  semestre                                                Int
+  mes                                                     Int
+  nombre_mes                                              String             @db.VarChar(30)
+  dia                                                     Int
+  dia_semana                                              String             @db.VarChar(30)
+  es_fin_de_semana                                        Boolean
+  FactAvisos                                              FactAvisos[]
+  FactMembresias_FactMembresias_sk_fecha_finToDimFecha    FactMembresias[]   @relation("FactMembresias_sk_fecha_finToDimFecha")
+  FactMembresias_FactMembresias_sk_fecha_inicioToDimFecha FactMembresias[]   @relation("FactMembresias_sk_fecha_inicioToDimFecha")
+  FactRenovaciones                                        FactRenovaciones[]
+  FactVentas                                              FactVentas[]
+
+  @@schema("dim")
+}
+
+model DimPlan {
+  sk_plan            Int              @id(map: "PK__DimPlan__FF3965EFE9A9A235") @default(autoincrement())
+  sk_plan_origen     Int?
+  id_plan_bk         Int              @unique(map: "UQ__DimPlan__EF48987BD4D604EC")
+  nombre_plan        String           @db.VarChar(60)
+  duracion_dias      Int?
+  precio_referencial Decimal?         @db.Decimal(12, 2)
+  categoria_duracion String?          @db.VarChar(40)
+  FactMembresias     FactMembresias[]
+  FactVentas         FactVentas[]
+
+  @@schema("dim")
+}
+
+model DimPromocion {
+  sk_promocion        Int              @id(map: "PK__DimPromo__1966EB6105F44DA2") @default(autoincrement())
+  sk_promocion_origen Int?
+  id_promocion_bk     Int              @unique(map: "UQ__DimPromo__A06792226CD53C3A")
+  nombre_promocion    String           @db.VarChar(100)
+  tipo_descuento      String           @db.VarChar(30)
+  valor_descuento     Decimal?         @db.Decimal(12, 2)
+  FactMembresias      FactMembresias[]
+  FactVentas          FactVentas[]
+
+  @@schema("dim")
+}
+
+model FactAvisos {
+  sk_aviso               BigInt       @id(map: "PK__FactAvis__0BDBA5D0E6F68CF5") @default(autoincrement())
+  id_aviso_bk            Int          @unique(map: "UQ__FactAvis__2FEB9C90E6A308EE")
+  sk_fecha_aviso         Int
+  sk_cliente             Int
+  sk_empleado            Int?
+  id_membresia_bk        Int?
+  dias_antes_vencimiento Int?
+  medio                  String       @db.VarChar(30)
+  estado                 String       @db.VarChar(30)
+  DimCliente             DimCliente   @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactAvisos_DimCliente")
+  DimEmpleado            DimEmpleado? @relation(fields: [sk_empleado], references: [sk_empleado], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactAvisos_DimEmpleado")
+  DimFecha               DimFecha     @relation(fields: [sk_fecha_aviso], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactAvisos_DimFecha")
+
+  @@schema("dm_comercial")
+}
+
+model FactMembresias {
+  sk_membresia                                      BigInt        @id(map: "PK__FactMemb__48BD13B01E63E3EE") @default(autoincrement())
+  id_membresia_bk                                   Int           @unique(map: "UQ__FactMemb__4831A45D01DCCCF8")
+  sk_cliente                                        Int
+  sk_plan                                           Int
+  sk_promocion                                      Int?
+  sk_empleado                                       Int?
+  sk_fecha_inicio                                   Int
+  sk_fecha_fin                                      Int
+  duracion_dias                                     Int?
+  precio_final                                      Decimal?      @db.Decimal(12, 2)
+  es_renovacion                                     Boolean
+  estado_membresia                                  String        @db.VarChar(30)
+  dias_anticipacion_renovacion                      Int?
+  DimCliente                                        DimCliente    @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactMembresias_DimCliente")
+  DimEmpleado                                       DimEmpleado?  @relation(fields: [sk_empleado], references: [sk_empleado], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactMembresias_DimEmpleado")
+  DimFecha_FactMembresias_sk_fecha_finToDimFecha    DimFecha      @relation("FactMembresias_sk_fecha_finToDimFecha", fields: [sk_fecha_fin], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactMembresias_DimFechaFin")
+  DimFecha_FactMembresias_sk_fecha_inicioToDimFecha DimFecha      @relation("FactMembresias_sk_fecha_inicioToDimFecha", fields: [sk_fecha_inicio], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactMembresias_DimFechaInicio")
+  DimPlan                                           DimPlan       @relation(fields: [sk_plan], references: [sk_plan], onUpdate: NoAction, map: "FK_FactMembresias_DimPlan")
+  DimPromocion                                      DimPromocion? @relation(fields: [sk_promocion], references: [sk_promocion], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactMembresias_DimPromocion")
+
+  @@schema("dm_comercial")
+}
+
+model FactRenovaciones {
+  sk_renovacion            BigInt       @id(map: "PK__FactReno__676CB6823B78960C") @default(autoincrement())
+  id_renovacion_bk         Int          @unique(map: "UQ__FactReno__EBE93B3E9DFCB368")
+  sk_fecha_renovacion      Int
+  sk_cliente               Int
+  sk_empleado              Int?
+  id_membresia_anterior_bk Int?
+  id_membresia_nueva_bk    Int?
+  dias_anticipacion        Int?
+  monto                    Decimal?     @db.Decimal(12, 2)
+  DimCliente               DimCliente   @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactRenovaciones_DimCliente")
+  DimEmpleado              DimEmpleado? @relation(fields: [sk_empleado], references: [sk_empleado], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactRenovaciones_DimEmpleado")
+  DimFecha                 DimFecha     @relation(fields: [sk_fecha_renovacion], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactRenovaciones_DimFecha")
+
+  @@schema("dm_comercial")
+}
+
+model FactVentas {
+  sk_venta           BigInt        @id(map: "PK__FactVent__4D088B28ECD7FD0A") @default(autoincrement())
+  id_pago_bk         Int           @unique(map: "UQ__FactVent__455E986D32D1C676")
+  sk_fecha_pago      Int
+  sk_cliente         Int
+  sk_plan            Int
+  sk_promocion       Int?
+  sk_empleado        Int?
+  id_membresia_bk    Int?
+  monto_neto         Decimal       @db.Decimal(12, 2)
+  descuento_aplicado Decimal?      @db.Decimal(12, 2)
+  precio_lista       Decimal?      @db.Decimal(12, 2)
+  metodo_pago        String        @db.VarChar(50)
+  DimCliente         DimCliente    @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactVentas_DimCliente")
+  DimEmpleado        DimEmpleado?  @relation(fields: [sk_empleado], references: [sk_empleado], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactVentas_DimEmpleado")
+  DimFecha           DimFecha      @relation(fields: [sk_fecha_pago], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactVentas_DimFecha")
+  DimPlan            DimPlan       @relation(fields: [sk_plan], references: [sk_plan], onUpdate: NoAction, map: "FK_FactVentas_DimPlan")
+  DimPromocion       DimPromocion? @relation(fields: [sk_promocion], references: [sk_promocion], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactVentas_DimPromocion")
+
+  @@schema("dm_comercial")
+}
