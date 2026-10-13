@@ -28,7 +28,10 @@ UNION ALL SELECT 'FactAvisos', COUNT_BIG(*) FROM dbo.FactAvisos
 UNION ALL SELECT 'FactAsistencias', COUNT_BIG(*) FROM dbo.FactAsistencias
 UNION ALL SELECT 'FactObjetivos', COUNT_BIG(*) FROM dbo.FactObjetivos
 UNION ALL SELECT 'FactEvaluaciones', COUNT_BIG(*) FROM dbo.FactEvaluaciones
-UNION ALL SELECT 'FactReclamos', COUNT_BIG(*) FROM dbo.FactReclamos;
+UNION ALL SELECT 'FactReclamos', COUNT_BIG(*) FROM dbo.FactReclamos
+UNION ALL SELECT 'FactSesionesProgramadas', COUNT_BIG(*) FROM dbo.FactSesionesProgramadas
+UNION ALL SELECT 'FactEvaluacionesProgramadas', COUNT_BIG(*) FROM dbo.FactEvaluacionesProgramadas
+UNION ALL SELECT 'FactRetenciones', COUNT_BIG(*) FROM dbo.FactRetenciones;
 GO
 
 /* 1.1. Las vistas siempre devuelven una fila de diagnóstico, incluso si no tienen datos. */
@@ -44,6 +47,8 @@ FROM
     UNION ALL SELECT 'DM_Entrenamiento_Asistencia', COUNT_BIG(*) FROM dbo.DM_Entrenamiento_Asistencia
     UNION ALL SELECT 'DM_Entrenamiento_Progreso', COUNT_BIG(*) FROM dbo.DM_Entrenamiento_Progreso
     UNION ALL SELECT 'DM_Entrenamiento_Cumplimiento', COUNT_BIG(*) FROM dbo.DM_Entrenamiento_Cumplimiento
+    UNION ALL SELECT 'DM_Entrenamiento_Evaluaciones', COUNT_BIG(*) FROM dbo.DM_Entrenamiento_Evaluaciones
+    UNION ALL SELECT 'DM_Atencion_Retencion', COUNT_BIG(*) FROM dbo.DM_Atencion_Retencion
 ) AS ResumenMetricas
 ORDER BY Vista;
 GO
@@ -166,6 +171,30 @@ SELECT 'Cumplimiento de objetivos' AS KPI,
 FROM dbo.DM_Entrenamiento_Cumplimiento
 WHERE TasaCumplimientoObjetivos IS NOT NULL
   AND (TasaCumplimientoObjetivos < 0 OR TasaCumplimientoObjetivos > 100);
+
+SELECT 'Tasa de asistencia' AS KPI,
+       COUNT(*) AS ValoresFueraDeRango
+FROM dbo.DM_Entrenamiento_Asistencia
+WHERE TasaAsistencia IS NOT NULL
+  AND (TasaAsistencia < 0 OR TasaAsistencia > 100);
+
+SELECT 'Resolución directa en mostrador' AS KPI,
+       COUNT(*) AS ValoresFueraDeRango
+FROM dbo.DM_Atencion_Reclamos
+WHERE TasaResolucionDirectaMostrador IS NOT NULL
+  AND (TasaResolucionDirectaMostrador < 0 OR TasaResolucionDirectaMostrador > 100);
+
+SELECT 'Cumplimiento de evaluaciones programadas' AS KPI,
+       COUNT(*) AS ValoresFueraDeRango
+FROM dbo.DM_Entrenamiento_Evaluaciones
+WHERE TasaCumplimientoEvaluaciones IS NOT NULL
+  AND (TasaCumplimientoEvaluaciones < 0 OR TasaCumplimientoEvaluaciones > 100);
+
+SELECT 'Éxito de retención' AS KPI,
+       COUNT(*) AS ValoresFueraDeRango
+FROM dbo.DM_Atencion_Retencion
+WHERE TasaExitoRetencion IS NOT NULL
+  AND (TasaExitoRetencion < 0 OR TasaExitoRetencion > 100);
 GO
 
 /* 7. Vista rápida de la marca CDC. */

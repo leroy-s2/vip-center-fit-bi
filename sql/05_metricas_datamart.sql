@@ -5,13 +5,13 @@
   Las métricas se calculan en SQL para validarlas antes de conectarlas a
   Power BI.
 
-  Limitaciones declaradas del origen:
-  - No existe una tabla de sesiones programadas; por eso la tasa de asistencia
-    no se inventa y queda marcada como no calculable.
-  - No existe un campo que indique si un reclamo fue resuelto directamente en
-    mostrador; se reportan reclamos resueltos según su estado.
-  - No existe fecha programada de evaluación; solo se reportan evaluaciones
-    registradas y progreso observable.
+  Brechas del Excel OFICIAL1 ya cerradas en el origen:
+  - Tasa de asistencia: se incorpora FactSesionesProgramadas como denominador
+    (sesiones programadas) de las asistencias registradas.
+  - Resolución directa en mostrador: FactReclamos expone resuelto_en_mostrador.
+  - Evaluaciones programadas: FactEvaluacionesProgramadas aporta la fecha prevista
+    (exigibles, completadas y pendientes).
+  - Retención en mostrador: FactRetenciones registra la acción y su resultado.
 =============================================================================*/
 
 USE BI_VIP_CENTER_FIT_DW;
@@ -307,7 +307,7 @@ LEFT JOIN dbo.DimFecha da ON da.sk_fecha = av.sk_fecha_aviso
 GROUP BY corte.fecha;
 GO
 
-/* 5. Recepción: reclamos registrados, resueltos, pendientes y tiempo medio de resolución. */
+/* 5. Recepción: reclamos registrados, resueltos, directos en mostrador y tiempos. */
 CREATE OR ALTER VIEW dbo.DM_Atencion_Reclamos
 AS
 SELECT
@@ -323,13 +323,23 @@ SELECT
         ELSE COUNT(DISTINCT CASE WHEN fr.estado = 'RESUELTO' THEN fr.id_reclamo_bk END) * 100.0
              / COUNT(DISTINCT fr.id_reclamo_bk)
     END AS TasaResolucionSegunEstado,
+    COUNT(DISTINCT CASE WHEN fr.estado = 'RESUELTO' AND fr.resuelto_en_mostrador = 1 THEN fr.id_reclamo_bk END) AS ReclamosResueltosMostrador,
+    CASE
+        WHEN COUNT(DISTINCT fr.id_reclamo_bk) = 0 THEN NULL
+        ELSE COUNT(DISTINCT CASE WHEN fr.estado = 'RESUELTO' AND fr.resuelto_en_mostrador = 1 THEN fr.id_reclamo_bk END) * 100.0
+             / COUNT(DISTINCT fr.id_reclamo_bk)
+    END AS TasaResolucionDirectaMostrador,
     AVG(CASE WHEN fr.estado = 'RESUELTO' THEN fr.dias_resolucion END) AS PromedioDiasResolucion
 FROM dbo.FactReclamos fr
 INNER JOIN dbo.DimFecha df ON df.sk_fecha = fr.sk_fecha_reclamo
 GROUP BY df.anio, df.mes, df.nombre_mes, fr.categoria;
 GO
 
-/* 6. Entrenamiento: asistencia registrada. No inventa sesiones programadas. */
+/* 6. Entrenamiento: sesiones programadas y asistidas (tasa de asistencia).
+
+   El Excel empareja "sesiones asistidas" con "sesiones programadas"; por eso ambas
+   salen de la misma entidad (FactSesionesProgramadas, según su estado_sesion).
+   FactAsistencias sigue siendo el fact de check-ins del gimnasio (lo usa DM_Rutinas_Entrenador). */
 CREATE OR ALTER VIEW dbo.DM_Entrenamiento_Asistencia
 AS
 SELECT
@@ -339,13 +349,16 @@ SELECT
     c.sk_cliente,
     c.id_cliente_bk,
     c.nombre_completo AS Cliente,
-    COUNT(DISTINCT fa.id_asistencia_bk) AS SesionesAsistidasRegistradas,
-    CAST(NULL AS INT) AS SesionesProgramadas,
-    CAST(NULL AS DECIMAL(10,2)) AS TasaAsistencia,
-    CAST(1 AS BIT) AS DenominadorSesionesProgramadasNoDisponible
-FROM dbo.FactAsistencias fa
-INNER JOIN dbo.DimFecha df ON df.sk_fecha = fa.sk_fecha_asistencia
-INNER JOIN dbo.DimCliente c ON c.sk_cliente = fa.sk_cliente
+    COUNT(DISTINCT CASE WHEN sp.estado_sesion = 'ASISTIDA' THEN sp.id_sesion_bk END) AS SesionesAsistidasRegistradas,
+    COUNT(DISTINCT sp.id_sesion_bk) AS SesionesProgramadas,
+    CASE
+        WHEN COUNT(DISTINCT sp.id_sesion_bk) = 0 THEN NULL
+        ELSE COUNT(DISTINCT CASE WHEN sp.estado_sesion = 'ASISTIDA' THEN sp.id_sesion_bk END) * 100.0
+             / COUNT(DISTINCT sp.id_sesion_bk)
+    END AS TasaAsistencia
+FROM dbo.FactSesionesProgramadas sp
+INNER JOIN dbo.DimFecha df ON df.sk_fecha = sp.sk_fecha_programada
+INNER JOIN dbo.DimCliente c ON c.sk_cliente = sp.sk_cliente
 GROUP BY df.anio, df.mes, df.nombre_mes, c.sk_cliente, c.id_cliente_bk, c.nombre_completo;
 GO
 
@@ -464,6 +477,33 @@ FROM Evaluado
 GROUP BY Anio, MesNumero, Mes, tipo_objetivo;
 GO
 
+/* 7.2. Entrenamiento: evaluaciones programadas (exigibles, completadas, pendientes). */
+CREATE OR ALTER VIEW dbo.DM_Entrenamiento_Evaluaciones
+AS
+SELECT
+    df.anio AS Anio,
+    df.mes AS MesNumero,
+    df.nombre_mes AS Mes,
+    c.sk_cliente,
+    c.id_cliente_bk,
+    c.nombre_completo AS Cliente,
+    COUNT(DISTINCT ep.id_evaluacion_programada_bk) AS EvaluacionesProgramadas,
+    COUNT(DISTINCT CASE WHEN ep.estado_evaluacion = 'COMPLETADA' THEN ep.id_evaluacion_programada_bk END) AS EvaluacionesCompletadas,
+    COUNT(DISTINCT CASE
+        WHEN ep.estado_evaluacion IN ('PROGRAMADA', 'PENDIENTE')
+         AND df.fecha <= '2026-09-29'
+        THEN ep.id_evaluacion_programada_bk END) AS EvaluacionesPendientes,
+    CASE
+        WHEN COUNT(DISTINCT ep.id_evaluacion_programada_bk) = 0 THEN NULL
+        ELSE COUNT(DISTINCT CASE WHEN ep.estado_evaluacion = 'COMPLETADA' THEN ep.id_evaluacion_programada_bk END) * 100.0
+             / COUNT(DISTINCT ep.id_evaluacion_programada_bk)
+    END AS TasaCumplimientoEvaluaciones
+FROM dbo.FactEvaluacionesProgramadas ep
+INNER JOIN dbo.DimFecha df ON df.sk_fecha = ep.sk_fecha_programada
+INNER JOIN dbo.DimCliente c ON c.sk_cliente = ep.sk_cliente
+GROUP BY df.anio, df.mes, df.nombre_mes, c.sk_cliente, c.id_cliente_bk, c.nombre_completo;
+GO
+
 /* 8. Vistas compatibles con los nombres de la primera versión. */
 CREATE OR ALTER VIEW dbo.DM_Ventas_Gerencia
 AS
@@ -517,6 +557,29 @@ INNER JOIN dbo.DimFecha df ON fr.sk_fecha_reclamo = df.sk_fecha
 INNER JOIN dbo.DimCliente dc ON fr.sk_cliente = dc.sk_cliente
 GROUP BY df.anio, df.mes, df.nombre_mes, dc.sexo, dc.rango_etario,
          dc.nombre_completo, fr.categoria, fr.estado;
+GO
+
+CREATE OR ALTER VIEW dbo.DM_Atencion_Retencion
+AS
+SELECT
+    df.anio AS Anio,
+    df.mes AS MesNumero,
+    df.nombre_mes AS Mes,
+    c.sk_cliente,
+    c.id_cliente_bk,
+    c.nombre_completo AS Cliente,
+    r.canal AS Canal,
+    COUNT(DISTINCT r.id_retencion_bk) AS AccionesRetencion,
+    COUNT(DISTINCT CASE WHEN r.resultado = 'RETENIDO' THEN r.id_retencion_bk END) AS ClientesRetenidos,
+    CASE
+        WHEN COUNT(DISTINCT r.id_retencion_bk) = 0 THEN NULL
+        ELSE COUNT(DISTINCT CASE WHEN r.resultado = 'RETENIDO' THEN r.id_retencion_bk END) * 100.0
+             / COUNT(DISTINCT r.id_retencion_bk)
+    END AS TasaExitoRetencion
+FROM dbo.FactRetenciones r
+INNER JOIN dbo.DimFecha df ON df.sk_fecha = r.sk_fecha_retencion
+INNER JOIN dbo.DimCliente c ON c.sk_cliente = r.sk_cliente
+GROUP BY df.anio, df.mes, df.nombre_mes, c.sk_cliente, c.id_cliente_bk, c.nombre_completo, r.canal;
 GO
 
 /* Pruebas rápidas de las salidas SQL antes de conectar Power BI. */

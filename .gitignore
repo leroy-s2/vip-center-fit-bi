@@ -12,3 +12,9 @@ prisma/generated/
 
 # Sistema
 .DS_Store
+
+# .NET
+bin/
+obj/
+*.user
+

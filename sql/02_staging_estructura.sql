@@ -148,7 +148,7 @@ CREATE TABLE stg.stg_ventas_membresias
     OperacionCDC TINYINT NULL,
     StartLSN VARBINARY(10) NULL,
     SeqVal VARBINARY(10) NULL,
-    EntidadOrigen VARCHAR(20) NOT NULL,
+    EntidadOrigen VARCHAR(30) NOT NULL,
 
     id_pago_bk INT NULL,
     id_membresia_bk INT NULL,
@@ -196,7 +196,7 @@ CREATE TABLE stg.stg_entrenamiento
     OperacionCDC TINYINT NULL,
     StartLSN VARBINARY(10) NULL,
     SeqVal VARBINARY(10) NULL,
-    EntidadOrigen VARCHAR(20) NOT NULL,
+    EntidadOrigen VARCHAR(30) NOT NULL,
 
     id_asistencia_bk INT NULL,
     id_objetivo_bk INT NULL,
@@ -220,6 +220,16 @@ CREATE TABLE stg.stg_entrenamiento
     grasa_corporal DECIMAL(8,2) NULL,
     masa_muscular DECIMAL(8,2) NULL,
 
+    id_sesion_bk INT NULL,
+    id_evaluacion_programada_bk INT NULL,
+    sk_fecha_programada_origen INT NULL,
+    tipo_sesion VARCHAR(40) NULL,
+    hora_programada INT NULL,
+    estado_sesion VARCHAR(30) NULL,
+    duracion_minutos INT NULL,
+    tipo_evaluacion VARCHAR(40) NULL,
+    estado_evaluacion VARCHAR(30) NULL,
+
     FechaIngesta DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME()
 );
 GO
@@ -232,7 +242,7 @@ CREATE TABLE stg.stg_atencion_reclamos
     OperacionCDC TINYINT NULL,
     StartLSN VARBINARY(10) NULL,
     SeqVal VARBINARY(10) NULL,
-    EntidadOrigen VARCHAR(20) NOT NULL,
+    EntidadOrigen VARCHAR(30) NOT NULL,
     id_reclamo_bk INT NULL,
     sk_fecha_reclamo_origen INT NULL,
     sk_cliente_origen INT NULL,
@@ -241,6 +251,14 @@ CREATE TABLE stg.stg_atencion_reclamos
     estado VARCHAR(30) NULL,
     fecha_resolucion DATETIME2(7) NULL,
     dias_resolucion INT NULL,
+    resuelto_en_mostrador BIT NULL,
+    id_retencion_bk INT NULL,
+    sk_fecha_retencion_origen INT NULL,
+    id_membresia_bk INT NULL,
+    canal VARCHAR(40) NULL,
+    motivo VARCHAR(60) NULL,
+    resultado VARCHAR(30) NULL,
+    monto_oferta DECIMAL(12,2) NULL,
     FechaIngesta DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME()
 );
 GO

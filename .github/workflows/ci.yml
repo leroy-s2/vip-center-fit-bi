@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    env:
+      MSSQL_SA_PASSWORD: "YourStrong!Passw0rd"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Levantar SQL Server, habilitar Agent y reconstruir el pipeline
+        run: bash scripts/bootstrap-db.sh
+
+      - name: Probar el ETL incremental (SQL)
+        run: |
+          docker exec vipfit-mssql /opt/mssql-tools18/bin/sqlcmd \
+            -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -b \
+            -i /sql/09_prueba_etl_incremental.sql
+
+      - name: Restore
+        run: dotnet restore src/VipCenterFit.BI.sln
+
+      - name: Build
+        run: dotnet build src/VipCenterFit.BI.sln -c Release --no-restore
+
+      - name: Test (integración contra SQL Server)
+        run: dotnet test tests/VipCenterFit.Api.Tests/VipCenterFit.Api.Tests.csproj -c Release --no-build

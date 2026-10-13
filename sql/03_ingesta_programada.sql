@@ -199,14 +199,59 @@ INSERT INTO stg.stg_atencion_reclamos
     CargaID, OperacionCDC, StartLSN, SeqVal, EntidadOrigen,
     id_reclamo_bk, sk_fecha_reclamo_origen, sk_cliente_origen,
     sk_empleado_origen, categoria, estado, fecha_resolucion,
-    dias_resolucion
+    dias_resolucion, resuelto_en_mostrador
 )
 SELECT
     @CargaID, 2, NULL, NULL, 'RECLAMO',
     id_reclamo_bk, sk_fecha_reclamo, sk_cliente,
     sk_empleado, categoria, estado, fecha_resolucion,
-    dias_resolucion
+    dias_resolucion, resuelto_en_mostrador
 FROM BI_VIP_CENTER_FIT_DW_ORIGEN.dbo.FactReclamos;
+
+/* Sesiones programadas (denominador de la tasa de asistencia). */
+INSERT INTO stg.stg_entrenamiento
+(
+    CargaID, OperacionCDC, StartLSN, SeqVal, EntidadOrigen,
+    id_sesion_bk, sk_fecha_programada_origen, sk_cliente_origen,
+    sk_plan_origen, sk_empleado_origen, tipo_sesion, hora_programada,
+    estado_sesion, duracion_minutos
+)
+SELECT
+    @CargaID, 2, NULL, NULL, 'SESION_PROGRAMADA',
+    id_sesion_bk, sk_fecha_programada, sk_cliente,
+    sk_plan, sk_empleado, tipo_sesion, hora_programada,
+    estado_sesion, duracion_minutos
+FROM BI_VIP_CENTER_FIT_DW_ORIGEN.dbo.FactSesionesProgramadas;
+
+/* Evaluaciones programadas (exigibles/pendientes). */
+INSERT INTO stg.stg_entrenamiento
+(
+    CargaID, OperacionCDC, StartLSN, SeqVal, EntidadOrigen,
+    id_evaluacion_programada_bk, sk_fecha_programada_origen, sk_cliente_origen,
+    sk_empleado_origen, id_objetivo_bk, tipo_evaluacion, estado_evaluacion,
+    id_evaluacion_bk
+)
+SELECT
+    @CargaID, 2, NULL, NULL, 'EVALUACION_PROGRAMADA',
+    id_evaluacion_programada_bk, sk_fecha_programada, sk_cliente,
+    sk_empleado, id_objetivo_bk, tipo_evaluacion, estado_evaluacion,
+    id_evaluacion_bk
+FROM BI_VIP_CENTER_FIT_DW_ORIGEN.dbo.FactEvaluacionesProgramadas;
+
+/* Retenciones en mostrador (acciones y resultado). */
+INSERT INTO stg.stg_atencion_reclamos
+(
+    CargaID, OperacionCDC, StartLSN, SeqVal, EntidadOrigen,
+    id_retencion_bk, sk_fecha_retencion_origen, sk_cliente_origen,
+    sk_empleado_origen, id_membresia_bk, canal, motivo, resultado,
+    monto_oferta
+)
+SELECT
+    @CargaID, 2, NULL, NULL, 'RETENCION',
+    id_retencion_bk, sk_fecha_retencion, sk_cliente,
+    sk_empleado, id_membresia_bk, canal, motivo, resultado,
+    monto_oferta
+FROM BI_VIP_CENTER_FIT_DW_ORIGEN.dbo.FactRetenciones;
 
 /* Control rápido de la ingesta. Los errores siguen presentes por diseño. */
 SELECT @CargaID AS CargaID, 'BATCH_INICIAL' AS TipoCarga;
@@ -226,5 +271,23 @@ GROUP BY EntidadOrigen
 UNION ALL
 SELECT EntidadOrigen, COUNT_BIG(*)
 FROM stg.stg_entrenamiento
+GROUP BY EntidadOrigen
+UNION ALL
+SELECT EntidadOrigen, COUNT_BIG(*)
+FROM stg.stg_atencion_reclamos
 GROUP BY EntidadOrigen;
+GO
+
+/* Al rehacer la fotografía completa, el TRUNCATE reinicia los IDENTITY del
+   staging; por eso la marca de agua del ETL debe volver a 0 para que la
+   siguiente carga incremental procese de nuevo todo el lote inicial.
+   La base del DW puede no existir todavía en la primera instalación. */
+IF DB_ID(N'BI_VIP_CENTER_FIT_DW') IS NOT NULL
+   AND OBJECT_ID(N'BI_VIP_CENTER_FIT_DW.dbo.etl_control', 'U') IS NOT NULL
+BEGIN
+    UPDATE BI_VIP_CENTER_FIT_DW.dbo.etl_control
+       SET ultimo_staging_id = 0,
+           ultima_carga = NULL,
+           filas_ultima_carga = NULL;
+END;
 GO

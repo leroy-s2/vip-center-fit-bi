@@ -26,5 +26,21 @@ services:
       retries: 30
       start_period: 40s
 
+  # API ASP.NET Core: escritura transaccional a ORIGEN + KPIs del DW (REST/OData).
+  api:
+    build:
+      context: ./src/VipCenterFit.Api
+    container_name: vipfit-api
+    depends_on:
+      mssql:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: "http://+:8080"
+      ConnectionStrings__Origen: "Server=mssql,1433;Database=BI_VIP_CENTER_FIT_DW_ORIGEN;User Id=sa;Password=${MSSQL_SA_PASSWORD:-YourStrong!Passw0rd};TrustServerCertificate=True;Encrypt=False"
+      ConnectionStrings__Stg: "Server=mssql,1433;Database=BI_VIP_CENTER_FIT_STG;User Id=sa;Password=${MSSQL_SA_PASSWORD:-YourStrong!Passw0rd};TrustServerCertificate=True;Encrypt=False"
+      ConnectionStrings__Dw: "Server=mssql,1433;Database=BI_VIP_CENTER_FIT_DW;User Id=sa;Password=${MSSQL_SA_PASSWORD:-YourStrong!Passw0rd};TrustServerCertificate=True;Encrypt=False"
+    ports:
+      - "${API_PORT:-5080}:8080"
+
 volumes:
   mssql_data:
