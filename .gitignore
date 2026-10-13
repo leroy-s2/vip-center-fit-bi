@@ -1,0 +1,14 @@
+# Dependencias
+node_modules/
+
+# Secretos / entorno
+.env
+
+# Cliente Prisma generado
+prisma/generated/
+
+# Salidas temporales del ERD (el ERD final en docs/ sí se versiona)
+*.tmp
+
+# Sistema
+.DS_Store

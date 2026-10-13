@@ -1,0 +1,30 @@
+name: vip-center-fit-bi
+
+# SQL Server 2022 para estudiar el esquema BI_VIP_CENTER_FIT con Prisma.
+# Puerto host por defecto 14330 para NO chocar con otras instancias en 1433.
+services:
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: vipfit-mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:-YourStrong!Passw0rd}"
+      MSSQL_PID: "Developer"
+    ports:
+      - "${MSSQL_PORT:-14330}:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+      - ./sql:/sql:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+volumes:
+  mssql_data:

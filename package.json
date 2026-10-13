@@ -1,0 +1,27 @@
+{
+  "name": "vip-center-fit-bi",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sandbox para estudiar el esquema BI_VIP_CENTER_FIT (SQL Server 2022) con Prisma: introspección (db pull) y UML/ERD (Mermaid).",
+  "type": "module",
+  "scripts": {
+    "setup": "npm install",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up -d",
+    "db:logs": "docker compose logs -f mssql",
+    "db:bootstrap": "bash scripts/bootstrap-db.sh",
+    "db:pull": "prisma db pull --schema prisma/schema.prisma",
+    "db:generate": "prisma generate --schema prisma/schema.prisma",
+    "db:studio": "prisma studio --schema prisma/schema.prisma",
+    "uml": "bash scripts/generate-uml.sh",
+    "uml:only": "node scripts/erd.mjs"
+  },
+  "devDependencies": {
+    "prisma": "6.19.3",
+    "@prisma/internals": "6.19.3"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3"
+  }
+}
