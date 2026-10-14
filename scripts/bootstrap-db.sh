@@ -80,6 +80,7 @@ run_sql "02_staging_estructura.sql"      # crea las tablas stg.*
 run_sql "03_ingesta_programada.sql"      # carga batch inicial -> staging
 run_sql "04_transformacion_datamart.sql" # DDL idempotente + ETL inicial -> data mart
 run_sql "05_metricas_datamart.sql"       # crea las vistas DM_* de KPIs
+run_sql "12_reglas_calidad.sql"          # auditoría de reglas de calidad (dq.*)
 run_sql "03_cdc_ingesta.sql"             # habilita CDC + proc usp_Ingesta_CDC + marca de agua
 run_sql "08_job_agent.sql"               # job VIPFIT_ETL_10min (cada 10 minutos)
 run_sql "10_usuarios_permisos.sql"       # usuarios de permisos mínimos (API, ETL, Power BI)

@@ -36,8 +36,6 @@ IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'DimEmpleado' AND is_tracked_by
     EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'DimEmpleado', @role_name = NULL, @supports_net_changes = 0;
 IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'DimPlan' AND is_tracked_by_cdc = 0)
     EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'DimPlan', @role_name = NULL, @supports_net_changes = 0;
-IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'DimPromocion' AND is_tracked_by_cdc = 0)
-    EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'DimPromocion', @role_name = NULL, @supports_net_changes = 0;
 IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'FactMembresias' AND is_tracked_by_cdc = 0)
     EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'FactMembresias', @role_name = NULL, @supports_net_changes = 0;
 IF EXISTS (SELECT 1 FROM sys.tables WHERE name = 'FactVentas' AND is_tracked_by_cdc = 0)
@@ -75,7 +73,7 @@ SELECT
 FROM sys.tables
 WHERE name IN
 (
-    'DimFecha', 'DimCliente', 'DimEmpleado', 'DimPlan', 'DimPromocion',
+    'DimFecha', 'DimCliente', 'DimEmpleado', 'DimPlan',
     'FactMembresias', 'FactVentas', 'FactRenovaciones', 'FactAvisos',
     'FactAsistencias', 'FactObjetivos', 'FactEvaluaciones', 'FactReclamos',
     'FactSesionesProgramadas', 'FactEvaluacionesProgramadas', 'FactRetenciones'
@@ -122,7 +120,7 @@ BEGIN
 
     /* LSN efectivo por capture instance (acotado a su mínimo propio). */
     DECLARE @fFecha BINARY(10), @fCli BINARY(10), @fEmp BINARY(10), @fPla BINARY(10);
-    DECLARE @fPro BINARY(10), @fMem BINARY(10), @fVen BINARY(10), @fRen BINARY(10);
+    DECLARE @fMem BINARY(10), @fVen BINARY(10), @fRen BINARY(10);
     DECLARE @fAvi BINARY(10), @fAsi BINARY(10), @fObj BINARY(10), @fEva BINARY(10), @fRec BINARY(10);
     DECLARE @fSes BINARY(10), @fEvaP BINARY(10), @fRet BINARY(10);
 
@@ -166,7 +164,6 @@ BEGIN
     SET @fCli   = CASE WHEN @DesdeLSN < BI_VIP_CENTER_FIT_DW_ORIGEN.sys.fn_cdc_get_min_lsn('dbo_DimCliente')   THEN BI_VIP_CENTER_FIT_DW_ORIGEN.sys.fn_cdc_get_min_lsn('dbo_DimCliente')   ELSE @DesdeLSN END;
     SET @fEmp   = CASE WHEN @DesdeLSN < BI_VIP_CENTER_FIT_DW_ORIGEN.sys.fn_cdc_get_min_lsn('dbo_DimEmpleado')  THEN BI_VIP_CENTER_FIT_DW_ORIGEN.sys.fn_cdc_get_min_lsn('dbo_DimEmpleado')  ELSE @DesdeLSN END;
     SET @fPla   = CASE WHEN @DesdeLSN < BI_VIP_CENTER_FIT_DW_ORIGEN.sys.fn_cdc_get_min_lsn('dbo_DimPlan')      THEN BI_VIP_CENTER_FIT_DW_ORIGEN.sys.fn_cdc_get_min_lsn('dbo_DimPlan')      ELSE @DesdeLSN END;
-    SET @fPro   = CASE WHEN @DesdeLSN < BI_VIP_CENTER_FIT_DW_ORIGEN.sys.fn_cdc_get_min_lsn('dbo_DimPromocion') THEN BI_VIP_CENTER_FIT_DW_ORIGEN.sys.fn_cdc_get_min_lsn('dbo_DimPromocion') ELSE @DesdeLSN END;
     SET @fMem   = CASE WHEN @DesdeLSN < BI_VIP_CENTER_FIT_DW_ORIGEN.sys.fn_cdc_get_min_lsn('dbo_FactMembresias')    THEN BI_VIP_CENTER_FIT_DW_ORIGEN.sys.fn_cdc_get_min_lsn('dbo_FactMembresias')    ELSE @DesdeLSN END;
     SET @fVen   = CASE WHEN @DesdeLSN < BI_VIP_CENTER_FIT_DW_ORIGEN.sys.fn_cdc_get_min_lsn('dbo_FactVentas')         THEN BI_VIP_CENTER_FIT_DW_ORIGEN.sys.fn_cdc_get_min_lsn('dbo_FactVentas')         ELSE @DesdeLSN END;
     SET @fRen   = CASE WHEN @DesdeLSN < BI_VIP_CENTER_FIT_DW_ORIGEN.sys.fn_cdc_get_min_lsn('dbo_FactRenovaciones')   THEN BI_VIP_CENTER_FIT_DW_ORIGEN.sys.fn_cdc_get_min_lsn('dbo_FactRenovaciones')   ELSE @DesdeLSN END;
@@ -250,38 +247,20 @@ BEGIN
             SET @Filas += @@ROWCOUNT;
         END;
 
-        IF @fPro IS NOT NULL AND @fPro <= @HastaLSN
-        BEGIN
-            INSERT INTO stg.stg_promociones
-            (
-                CargaID, OperacionCDC, StartLSN, SeqVal,
-                sk_promocion_origen, id_promocion_bk, nombre_promocion,
-                tipo_descuento, valor_descuento
-            )
-            SELECT
-                @CargaID, __$operation, __$start_lsn, __$seqval,
-                sk_promocion, id_promocion_bk, nombre_promocion,
-                tipo_descuento, valor_descuento
-            FROM BI_VIP_CENTER_FIT_DW_ORIGEN.cdc.fn_cdc_get_all_changes_dbo_DimPromocion(@fPro, @HastaLSN, 'all')
-            WHERE __$operation IN (1, 2, 4);
-            SET @Filas += @@ROWCOUNT;
-        END;
-
         IF @fMem IS NOT NULL AND @fMem <= @HastaLSN
         BEGIN
             INSERT INTO stg.stg_ventas_membresias
             (
                 CargaID, OperacionCDC, StartLSN, SeqVal, EntidadOrigen,
                 id_membresia_bk, sk_fecha_inicio_origen, sk_fecha_fin_origen,
-                sk_cliente_origen, sk_plan_origen, sk_promocion_origen,
-                sk_empleado_origen, duracion_dias, precio_final, es_renovacion,
+                sk_cliente_origen, sk_plan_origen, sk_empleado_origen,
+                duracion_dias, precio_final, es_renovacion,
                 estado_membresia, dias_anticipacion_renovacion
             )
             SELECT
                 @CargaID, __$operation, __$start_lsn, __$seqval, 'MEMBRESIA',
                 id_membresia_bk, sk_fecha_inicio, sk_fecha_fin,
-                sk_cliente, sk_plan, sk_promocion,
-                sk_empleado, duracion_dias, precio_final, es_renovacion,
+                sk_cliente, sk_plan, sk_empleado, duracion_dias, precio_final, es_renovacion,
                 estado_membresia, dias_anticipacion_renovacion
             FROM BI_VIP_CENTER_FIT_DW_ORIGEN.cdc.fn_cdc_get_all_changes_dbo_FactMembresias(@fMem, @HastaLSN, 'all')
             WHERE __$operation IN (1, 2, 4);
@@ -294,13 +273,13 @@ BEGIN
             (
                 CargaID, OperacionCDC, StartLSN, SeqVal, EntidadOrigen,
                 id_pago_bk, sk_fecha_pago_origen, sk_cliente_origen, sk_plan_origen,
-                sk_promocion_origen, sk_empleado_origen, id_membresia_bk,
+                sk_empleado_origen, id_membresia_bk,
                 monto_neto, descuento_aplicado, precio_lista, metodo_pago
             )
             SELECT
                 @CargaID, __$operation, __$start_lsn, __$seqval, 'VENTA',
                 id_pago_bk, sk_fecha_pago, sk_cliente, sk_plan,
-                sk_promocion, sk_empleado, id_membresia_bk,
+                sk_empleado, id_membresia_bk,
                 monto_neto, descuento_aplicado, precio_lista, metodo_pago
             FROM BI_VIP_CENTER_FIT_DW_ORIGEN.cdc.fn_cdc_get_all_changes_dbo_FactVentas(@fVen, @HastaLSN, 'all')
             WHERE __$operation IN (1, 2, 4);

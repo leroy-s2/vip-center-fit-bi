@@ -31,7 +31,6 @@ DECLARE @TestPagoID INT;
 DECLARE @SKFecha INT;
 DECLARE @SKCliente INT;
 DECLARE @SKPlan INT;
-DECLARE @SKPromocion INT;
 DECLARE @SKEmpleado INT;
 DECLARE @IDMembresia INT;
 
@@ -41,19 +40,18 @@ FROM dbo.FactVentas;
 SELECT TOP (1) @SKFecha = sk_fecha FROM dbo.DimFecha ORDER BY sk_fecha;
 SELECT TOP (1) @SKCliente = sk_cliente FROM dbo.DimCliente ORDER BY sk_cliente;
 SELECT TOP (1) @SKPlan = sk_plan FROM dbo.DimPlan ORDER BY sk_plan;
-SELECT TOP (1) @SKPromocion = sk_promocion FROM dbo.DimPromocion ORDER BY sk_promocion;
 SELECT TOP (1) @SKEmpleado = sk_empleado FROM dbo.DimEmpleado ORDER BY sk_empleado;
 SELECT TOP (1) @IDMembresia = id_membresia_bk FROM dbo.FactMembresias ORDER BY id_membresia_bk;
 
 INSERT INTO dbo.FactVentas
 (
-    id_pago_bk, sk_fecha_pago, sk_cliente, sk_plan, sk_promocion,
+    id_pago_bk, sk_fecha_pago, sk_cliente, sk_plan,
     sk_empleado, id_membresia_bk, monto_neto, descuento_aplicado,
     precio_lista, metodo_pago
 )
 VALUES
 (
-    @TestPagoID, @SKFecha, @SKCliente, @SKPlan, @SKPromocion,
+    @TestPagoID, @SKFecha, @SKCliente, @SKPlan,
     @SKEmpleado, @IDMembresia, 99.90, 0, 99.90, 'PRUEBA_CDC'
 );
 

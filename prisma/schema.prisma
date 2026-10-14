@@ -87,30 +87,15 @@ model DimFecha {
 
 model DimPlan {
   sk_plan                 Int                       @id(map: "PK__DimPlan__FF3965EFE9A9A235") @default(autoincrement())
-  sk_plan_origen          Int?
-  id_plan_bk              Int                       @unique(map: "UQ__DimPlan__EF48987BD4D604EC")
-  nombre_plan             String                    @db.VarChar(60)
-  duracion_dias           Int?
-  precio_referencial      Decimal?                  @db.Decimal(12, 2)
-  categoria_duracion      String?                   @db.VarChar(40)
+  tipo_plan               String                    @db.VarChar(40)
+  tipo_operacion          String                    @db.VarChar(40)
+  promocion               String                    @db.VarChar(100)
   FactAsistencias         FactAsistencias[]
   FactMembresias          FactMembresias[]
   FactSesionesProgramadas FactSesionesProgramadas[]
   FactVentas              FactVentas[]
 
-  @@schema("dim")
-}
-
-model DimPromocion {
-  sk_promocion        Int              @id(map: "PK__DimPromo__1966EB6105F44DA2") @default(autoincrement())
-  sk_promocion_origen Int?
-  id_promocion_bk     Int              @unique(map: "UQ__DimPromo__A06792226CD53C3A")
-  nombre_promocion    String           @db.VarChar(100)
-  tipo_descuento      String           @db.VarChar(30)
-  valor_descuento     Decimal?         @db.Decimal(12, 2)
-  FactMembresias      FactMembresias[]
-  FactVentas          FactVentas[]
-
+  @@unique([tipo_plan, tipo_operacion, promocion], map: "UQ_DimPlan_Combinacion")
   @@schema("dim")
 }
 
@@ -171,7 +156,6 @@ model FactMembresias {
   id_membresia_bk                                   Int           @unique(map: "UQ__FactMemb__4831A45D01DCCCF8")
   sk_cliente                                        Int
   sk_plan                                           Int
-  sk_promocion                                      Int?
   sk_empleado                                       Int?
   sk_fecha_inicio                                   Int
   sk_fecha_fin                                      Int
@@ -185,7 +169,6 @@ model FactMembresias {
   DimFecha_FactMembresias_sk_fecha_finToDimFecha    DimFecha      @relation("FactMembresias_sk_fecha_finToDimFecha", fields: [sk_fecha_fin], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactMembresias_DimFechaFin")
   DimFecha_FactMembresias_sk_fecha_inicioToDimFecha DimFecha      @relation("FactMembresias_sk_fecha_inicioToDimFecha", fields: [sk_fecha_inicio], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactMembresias_DimFechaInicio")
   DimPlan                                           DimPlan       @relation(fields: [sk_plan], references: [sk_plan], onUpdate: NoAction, map: "FK_FactMembresias_DimPlan")
-  DimPromocion                                      DimPromocion? @relation(fields: [sk_promocion], references: [sk_promocion], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactMembresias_DimPromocion")
 
   @@schema("dm_comercial")
 }
@@ -247,7 +230,6 @@ model FactVentas {
   sk_fecha_pago      Int
   sk_cliente         Int
   sk_plan            Int
-  sk_promocion       Int?
   sk_empleado        Int?
   id_membresia_bk    Int?
   monto_neto         Decimal       @db.Decimal(12, 2)
@@ -258,7 +240,6 @@ model FactVentas {
   DimEmpleado        DimEmpleado?  @relation(fields: [sk_empleado], references: [sk_empleado], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactVentas_DimEmpleado")
   DimFecha           DimFecha      @relation(fields: [sk_fecha_pago], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactVentas_DimFecha")
   DimPlan            DimPlan       @relation(fields: [sk_plan], references: [sk_plan], onUpdate: NoAction, map: "FK_FactVentas_DimPlan")
-  DimPromocion       DimPromocion? @relation(fields: [sk_promocion], references: [sk_promocion], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactVentas_DimPromocion")
 
   @@schema("dm_comercial")
 }

@@ -15,10 +15,7 @@
     "db:generate": "prisma generate --schema prisma/schema.prisma",
     "db:studio": "prisma studio --schema prisma/schema.prisma",
     "uml": "bash scripts/generate-uml.sh",
-    "uml:only": "node scripts/erd.mjs",
-    "uml:comercial": "bash scripts/generate-uml-mart.sh dm_comercial",
-    "uml:entrenamiento": "bash scripts/generate-uml-mart.sh dm_entrenamiento",
-    "uml:atencion": "bash scripts/generate-uml-mart.sh dm_atencion"
+    "uml:only": "node scripts/erd.mjs"
   },
   "devDependencies": {
     "prisma": "6.19.3",

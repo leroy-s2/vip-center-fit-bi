@@ -21,7 +21,6 @@ DECLARE @CargaID UNIQUEIDENTIFIER = NEWID();
 TRUNCATE TABLE stg.stg_atencion_reclamos;
 TRUNCATE TABLE stg.stg_entrenamiento;
 TRUNCATE TABLE stg.stg_ventas_membresias;
-TRUNCATE TABLE stg.stg_promociones;
 TRUNCATE TABLE stg.stg_planes;
 TRUNCATE TABLE stg.stg_empleados;
 TRUNCATE TABLE stg.stg_clientes;
@@ -76,32 +75,19 @@ SELECT
     precio_referencial, categoria_duracion
 FROM BI_VIP_CENTER_FIT_DW_ORIGEN.dbo.DimPlan;
 
-INSERT INTO stg.stg_promociones
-(
-    CargaID, OperacionCDC, StartLSN, SeqVal,
-    sk_promocion_origen, id_promocion_bk, nombre_promocion,
-    tipo_descuento, valor_descuento
-)
-SELECT
-    @CargaID, 2, NULL, NULL,
-    sk_promocion, id_promocion_bk, nombre_promocion,
-    tipo_descuento, valor_descuento
-FROM BI_VIP_CENTER_FIT_DW_ORIGEN.dbo.DimPromocion;
-
 /* Membresías. */
 INSERT INTO stg.stg_ventas_membresias
 (
     CargaID, OperacionCDC, StartLSN, SeqVal, EntidadOrigen,
     id_membresia_bk, sk_fecha_inicio_origen, sk_fecha_fin_origen,
-    sk_cliente_origen, sk_plan_origen, sk_promocion_origen,
-    sk_empleado_origen, duracion_dias, precio_final, es_renovacion,
+    sk_cliente_origen, sk_plan_origen, sk_empleado_origen,
+    duracion_dias, precio_final, es_renovacion,
     estado_membresia, dias_anticipacion_renovacion
 )
 SELECT
     @CargaID, 2, NULL, NULL, 'MEMBRESIA',
     id_membresia_bk, sk_fecha_inicio, sk_fecha_fin,
-    sk_cliente, sk_plan, sk_promocion,
-    sk_empleado, duracion_dias, precio_final, es_renovacion,
+    sk_cliente, sk_plan, sk_empleado, duracion_dias, precio_final, es_renovacion,
     estado_membresia, dias_anticipacion_renovacion
 FROM BI_VIP_CENTER_FIT_DW_ORIGEN.dbo.FactMembresias;
 
@@ -110,13 +96,13 @@ INSERT INTO stg.stg_ventas_membresias
 (
     CargaID, OperacionCDC, StartLSN, SeqVal, EntidadOrigen,
     id_pago_bk, sk_fecha_pago_origen, sk_cliente_origen, sk_plan_origen,
-    sk_promocion_origen, sk_empleado_origen, id_membresia_bk,
+    sk_empleado_origen, id_membresia_bk,
     monto_neto, descuento_aplicado, precio_lista, metodo_pago
 )
 SELECT
     @CargaID, 2, NULL, NULL, 'VENTA',
     id_pago_bk, sk_fecha_pago, sk_cliente, sk_plan,
-    sk_promocion, sk_empleado, id_membresia_bk,
+    sk_empleado, id_membresia_bk,
     monto_neto, descuento_aplicado, precio_lista, metodo_pago
 FROM BI_VIP_CENTER_FIT_DW_ORIGEN.dbo.FactVentas;
 
@@ -260,7 +246,6 @@ SELECT 'stg_fecha' AS Tabla, COUNT_BIG(*) AS Filas FROM stg.stg_fecha
 UNION ALL SELECT 'stg_clientes', COUNT_BIG(*) FROM stg.stg_clientes
 UNION ALL SELECT 'stg_empleados', COUNT_BIG(*) FROM stg.stg_empleados
 UNION ALL SELECT 'stg_planes', COUNT_BIG(*) FROM stg.stg_planes
-UNION ALL SELECT 'stg_promociones', COUNT_BIG(*) FROM stg.stg_promociones
 UNION ALL SELECT 'stg_ventas_membresias', COUNT_BIG(*) FROM stg.stg_ventas_membresias
 UNION ALL SELECT 'stg_entrenamiento', COUNT_BIG(*) FROM stg.stg_entrenamiento
 UNION ALL SELECT 'stg_atencion_reclamos', COUNT_BIG(*) FROM stg.stg_atencion_reclamos;

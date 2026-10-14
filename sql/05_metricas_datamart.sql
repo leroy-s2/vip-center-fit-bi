@@ -242,7 +242,7 @@ SELECT
     YEAR(c.PeriodoInicio) AS Anio,
     MONTH(c.PeriodoInicio) AS MesNumero,
     DATENAME(MONTH, c.PeriodoInicio) AS Mes,
-    dp.nombre_plan AS TipoPlan,
+    dp.tipo_plan AS TipoPlan,
     COALESCE(i.IngresosPorPlan, 0) AS IngresosPorTipoPlan,
     COALESCE(i.VentasPorPlan, 0) AS VentasPorPlan,
     COALESCE(v.MembresiasVendidas, 0) AS MembresiasVendidas,
@@ -512,13 +512,13 @@ SELECT
     df.trimestre AS Trimestre,
     df.mes AS MesNumero,
     df.nombre_mes AS Mes,
-    dp.nombre_plan AS Membresia,
+    dp.tipo_plan AS Membresia,
     SUM(fv.monto_neto) AS Total_Ingresos,
     COUNT(DISTINCT fv.id_pago_bk) AS Cantidad_Ventas
 FROM dbo.FactVentas fv
 INNER JOIN dbo.DimFecha df ON fv.sk_fecha_pago = df.sk_fecha
 INNER JOIN dbo.DimPlan dp ON fv.sk_plan = dp.sk_plan
-GROUP BY df.anio, df.trimestre, df.mes, df.nombre_mes, dp.nombre_plan;
+GROUP BY df.anio, df.trimestre, df.mes, df.nombre_mes, dp.tipo_plan;
 GO
 
 CREATE OR ALTER VIEW dbo.DM_Rutinas_Entrenador
@@ -529,7 +529,7 @@ SELECT
     df.nombre_mes AS Mes,
     dc.rango_etario AS Rango_Etario_Cliente,
     de.nombre_completo AS Nombre_Entrenador,
-    dp.nombre_plan AS Tipo_Plan,
+    dp.tipo_plan AS Tipo_Plan,
     COUNT(DISTINCT fa.id_asistencia_bk) AS Total_Asistencias
 FROM dbo.FactAsistencias fa
 INNER JOIN dbo.DimFecha df ON fa.sk_fecha_asistencia = df.sk_fecha
@@ -537,7 +537,7 @@ INNER JOIN dbo.DimCliente dc ON fa.sk_cliente = dc.sk_cliente
 LEFT JOIN dbo.DimEmpleado de ON fa.sk_empleado = de.sk_empleado
 LEFT JOIN dbo.DimPlan dp ON fa.sk_plan = dp.sk_plan
 GROUP BY df.anio, df.mes, df.nombre_mes, dc.rango_etario,
-         de.nombre_completo, dp.nombre_plan;
+         de.nombre_completo, dp.tipo_plan;
 GO
 
 CREATE OR ALTER VIEW dbo.DM_Atencion_Recepcion
@@ -582,10 +582,77 @@ INNER JOIN dbo.DimCliente c ON c.sk_cliente = r.sk_cliente
 GROUP BY df.anio, df.mes, df.nombre_mes, c.sk_cliente, c.id_cliente_bk, c.nombre_completo, r.canal;
 GO
 
+/* ------------------- Métricas de promoción (data mart comercial) -------------------
+   Se alimentan de DimPlan.promocion (planes promocionales de periodo corto del
+   catálogo). Todas consideran solo promociones reales (promocion <> 'SIN PROMOCION'). */
+
+/* 9. Comercial: ingresos, ventas y descuento otorgado por promoción.
+   Dimensiones: Fecha, Plan. */
+CREATE OR ALTER VIEW dbo.DM_Promociones_Ventas
+AS
+SELECT
+    df.anio AS Anio,
+    df.mes AS MesNumero,
+    df.nombre_mes AS Mes,
+    dp.tipo_plan AS TipoPlan,
+    dp.promocion AS Promocion,
+    SUM(fv.monto_neto) AS IngresosPorPromocion,
+    COUNT(DISTINCT fv.id_pago_bk) AS VentasPorPromocion,
+    SUM(fv.descuento_aplicado) AS DescuentoOtorgado
+FROM dbo.FactVentas fv
+INNER JOIN dbo.DimFecha df ON df.sk_fecha = fv.sk_fecha_pago
+INNER JOIN dbo.DimPlan dp ON dp.sk_plan = fv.sk_plan
+WHERE dp.promocion <> 'SIN PROMOCION'
+GROUP BY df.anio, df.mes, df.nombre_mes, dp.tipo_plan, dp.promocion;
+GO
+
+/* 10. Comercial: membresías vendidas y renovadas por promoción y empleado.
+   Dimensiones: Fecha, Empleado, Plan. */
+CREATE OR ALTER VIEW dbo.DM_Promociones_Membresias
+AS
+SELECT
+    df.anio AS Anio,
+    df.mes AS MesNumero,
+    df.nombre_mes AS Mes,
+    dp.promocion AS Promocion,
+    de.nombre_completo AS Empleado,
+    COUNT(DISTINCT fm.id_membresia_bk) AS MembresiasVendidas,
+    COUNT(DISTINCT CASE WHEN fm.es_renovacion = 1 THEN fm.id_membresia_bk END) AS MembresiasRenovadas
+FROM dbo.FactMembresias fm
+INNER JOIN dbo.DimFecha df ON df.sk_fecha = fm.sk_fecha_inicio
+INNER JOIN dbo.DimPlan dp ON dp.sk_plan = fm.sk_plan
+LEFT JOIN dbo.DimEmpleado de ON de.sk_empleado = fm.sk_empleado
+WHERE dp.promocion <> 'SIN PROMOCION'
+GROUP BY df.anio, df.mes, df.nombre_mes, dp.promocion, de.nombre_completo;
+GO
+
+/* 11. Comercial: clientes captados por promoción y segmento (sexo/rango etario).
+   Dimensiones: Fecha, Cliente, Plan. */
+CREATE OR ALTER VIEW dbo.DM_Promociones_Clientes
+AS
+SELECT
+    df.anio AS Anio,
+    df.mes AS MesNumero,
+    df.nombre_mes AS Mes,
+    dp.promocion AS Promocion,
+    dc.sexo AS Sexo,
+    dc.rango_etario AS RangoEtario,
+    COUNT(DISTINCT fm.sk_cliente) AS ClientesCaptados
+FROM dbo.FactMembresias fm
+INNER JOIN dbo.DimFecha df ON df.sk_fecha = fm.sk_fecha_inicio
+INNER JOIN dbo.DimPlan dp ON dp.sk_plan = fm.sk_plan
+INNER JOIN dbo.DimCliente dc ON dc.sk_cliente = fm.sk_cliente
+WHERE dp.promocion <> 'SIN PROMOCION'
+GROUP BY df.anio, df.mes, df.nombre_mes, dp.promocion, dc.sexo, dc.rango_etario;
+GO
+
 /* Pruebas rápidas de las salidas SQL antes de conectar Power BI. */
 SELECT TOP (20) * FROM dbo.DM_Gerencia_Ingresos ORDER BY Anio, MesNumero;
 SELECT TOP (20) * FROM dbo.DM_Gerencia_Membresias ORDER BY Anio, MesNumero;
 SELECT TOP (20) * FROM dbo.DM_Comercial_Plan ORDER BY Anio, MesNumero, TipoPlan;
 SELECT TOP (20) * FROM dbo.DM_Atencion_Reclamos ORDER BY Anio, MesNumero;
 SELECT TOP (20) * FROM dbo.DM_Entrenamiento_Progreso ORDER BY id_cliente_bk, id_objetivo_bk;
+SELECT TOP (20) * FROM dbo.DM_Promociones_Ventas ORDER BY Anio, MesNumero, Promocion;
+SELECT TOP (20) * FROM dbo.DM_Promociones_Membresias ORDER BY Anio, MesNumero, Promocion;
+SELECT TOP (20) * FROM dbo.DM_Promociones_Clientes ORDER BY Anio, MesNumero, Promocion;
 GO

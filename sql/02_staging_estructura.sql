@@ -28,7 +28,6 @@ GO
 DROP TABLE IF EXISTS stg.stg_atencion_reclamos;
 DROP TABLE IF EXISTS stg.stg_entrenamiento;
 DROP TABLE IF EXISTS stg.stg_ventas_membresias;
-DROP TABLE IF EXISTS stg.stg_promociones;
 DROP TABLE IF EXISTS stg.stg_planes;
 DROP TABLE IF EXISTS stg.stg_empleados;
 DROP TABLE IF EXISTS stg.stg_clientes;
@@ -124,22 +123,6 @@ CREATE TABLE stg.stg_planes
 );
 GO
 
-CREATE TABLE stg.stg_promociones
-(
-    StagingID BIGINT IDENTITY(1,1) PRIMARY KEY,
-    CargaID UNIQUEIDENTIFIER NOT NULL,
-    OperacionCDC TINYINT NULL,
-    StartLSN VARBINARY(10) NULL,
-    SeqVal VARBINARY(10) NULL,
-    sk_promocion_origen INT NULL,
-    id_promocion_bk INT NULL,
-    nombre_promocion VARCHAR(100) NULL,
-    tipo_descuento VARCHAR(30) NULL,
-    valor_descuento DECIMAL(12,2) NULL,
-    FechaIngesta DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME()
-);
-GO
-
 /* Ventas, membresías, renovaciones y avisos del dominio comercial. */
 CREATE TABLE stg.stg_ventas_membresias
 (
@@ -164,7 +147,6 @@ CREATE TABLE stg.stg_ventas_membresias
     sk_fecha_aviso_origen INT NULL,
     sk_cliente_origen INT NULL,
     sk_plan_origen INT NULL,
-    sk_promocion_origen INT NULL,
     sk_empleado_origen INT NULL,
 
     duracion_dias INT NULL,
@@ -269,7 +251,6 @@ CREATE INDEX IX_stg_clientes_sk ON stg.stg_clientes(sk_cliente_origen);
 CREATE INDEX IX_stg_clientes_bk ON stg.stg_clientes(id_cliente_bk);
 CREATE INDEX IX_stg_empleados_sk ON stg.stg_empleados(sk_empleado_origen);
 CREATE INDEX IX_stg_planes_sk ON stg.stg_planes(sk_plan_origen);
-CREATE INDEX IX_stg_promociones_sk ON stg.stg_promociones(sk_promocion_origen);
 CREATE INDEX IX_stg_ventas_entidad ON stg.stg_ventas_membresias(EntidadOrigen);
 CREATE INDEX IX_stg_entrenamiento_entidad ON stg.stg_entrenamiento(EntidadOrigen);
 CREATE INDEX IX_stg_reclamos_entidad ON stg.stg_atencion_reclamos(EntidadOrigen);

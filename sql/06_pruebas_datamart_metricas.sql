@@ -20,7 +20,6 @@ SELECT 'DimFecha' AS Tabla, COUNT_BIG(*) AS Filas FROM dbo.DimFecha
 UNION ALL SELECT 'DimCliente', COUNT_BIG(*) FROM dbo.DimCliente
 UNION ALL SELECT 'DimEmpleado', COUNT_BIG(*) FROM dbo.DimEmpleado
 UNION ALL SELECT 'DimPlan', COUNT_BIG(*) FROM dbo.DimPlan
-UNION ALL SELECT 'DimPromocion', COUNT_BIG(*) FROM dbo.DimPromocion
 UNION ALL SELECT 'FactVentas', COUNT_BIG(*) FROM dbo.FactVentas
 UNION ALL SELECT 'FactMembresias', COUNT_BIG(*) FROM dbo.FactMembresias
 UNION ALL SELECT 'FactRenovaciones', COUNT_BIG(*) FROM dbo.FactRenovaciones

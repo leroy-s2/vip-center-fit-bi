@@ -32,21 +32,21 @@ public sealed class OrigenRepository(DbConnectionFactory factory)
 
     public Task<int> InsertMembresiaAsync(MembresiaRequest r, CancellationToken ct) => ExecAsync("""
         INSERT INTO dbo.FactMembresias
-            (id_membresia_bk, sk_cliente, sk_plan, sk_promocion, sk_empleado, sk_fecha_inicio,
+            (id_membresia_bk, sk_cliente, sk_plan, sk_empleado, sk_fecha_inicio,
              sk_fecha_fin, duracion_dias, precio_final, es_renovacion, estado_membresia,
              dias_anticipacion_renovacion)
         VALUES
-            (@IdMembresiaBk, @SkCliente, @SkPlan, @SkPromocion, @SkEmpleado, @SkFechaInicio,
+            (@IdMembresiaBk, @SkCliente, @SkPlan, @SkEmpleado, @SkFechaInicio,
              @SkFechaFin, @DuracionDias, @PrecioFinal, @EsRenovacion, @EstadoMembresia,
              @DiasAnticipacionRenovacion)
         """, r, ct);
 
     public Task<int> InsertVentaAsync(VentaRequest r, CancellationToken ct) => ExecAsync("""
         INSERT INTO dbo.FactVentas
-            (id_pago_bk, sk_fecha_pago, sk_cliente, sk_plan, sk_promocion, sk_empleado,
+            (id_pago_bk, sk_fecha_pago, sk_cliente, sk_plan, sk_empleado,
              id_membresia_bk, monto_neto, descuento_aplicado, precio_lista, metodo_pago)
         VALUES
-            (@IdPagoBk, @SkFechaPago, @SkCliente, @SkPlan, @SkPromocion, @SkEmpleado,
+            (@IdPagoBk, @SkFechaPago, @SkCliente, @SkPlan, @SkEmpleado,
              @IdMembresiaBk, @MontoNeto, @DescuentoAplicado, @PrecioLista, @MetodoPago)
         """, r, ct);
 

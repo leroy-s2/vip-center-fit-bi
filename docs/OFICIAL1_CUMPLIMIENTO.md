@@ -34,6 +34,14 @@ API: `GET /api/v1/kpis/gerencia/ingresos`, `GET /api/v1/kpis/gerencia/membresias
 | Avisos de renovación emitidos | `AvisosRenovacionEmitidos` | ✅ |
 | Tasa de cobertura de avisos de renovación | `TasaCoberturaAvisos` | ✅ |
 
+**Métricas nuevas de promoción** (no estaban en el Excel): se derivan de `DimPlan.promocion` — los planes promocionales de periodo corto del catálogo.
+
+| Métrica nueva | Vista | Dimensiones (matriz bus) |
+| --- | --- | --- |
+| Ingresos, ventas y descuento por promoción | `DM_Promociones_Ventas` | Fecha, Plan |
+| Membresías vendidas/renovadas por promoción y empleado | `DM_Promociones_Membresias` | Fecha, Empleado, Plan |
+| Clientes captados por promoción y segmento | `DM_Promociones_Clientes` | Fecha, Cliente, Plan |
+
 API: `GET /api/v1/kpis/comercial/planes`, `GET /api/v1/kpis/comercial/avisos-cobertura`.
 
 ## Recepción — `DM_Atencion_Reclamos` y `DM_Atencion_Recepcion`
@@ -70,10 +78,10 @@ API: `GET /api/v1/kpis/entrenamiento/asistencia|progreso|cumplimiento|evaluacion
 ## Matriz bus (dimensiones conformadas)
 
 El Excel pide dimensiones fecha (año/trimestre/mes/día), cliente (nombre/sexo/rango etario),
-empleado (nombre/puesto/área), membresía (tipo de plan) y promoción (nombre). El esquema
-`dim` las cubre: `DimFecha` (anio/trimestre/mes/dia), `DimCliente`
-(nombre_completo/sexo/rango_etario), `DimEmpleado` (nombre_completo/cargo/area),
-`DimPlan` (nombre_plan), `DimPromocion` (nombre_promocion). ✅
+empleado (nombre/puesto/área) y plan (tipo de plan / tipo de operación / promoción). El esquema
+`dim` las cubre con **4 dimensiones conformadas**: `DimFecha` (anio/trimestre/mes/dia),
+`DimCliente` (nombre_completo/sexo/rango_etario), `DimEmpleado` (nombre_completo/cargo/area)
+y `DimPlan` (tipo_plan/tipo_operacion/promocion), que absorbe el antiguo `DimPromocion`. ✅
 
 ## Brechas cerradas (datos nuevos en la fuente)
 

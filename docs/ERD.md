@@ -1,7 +1,7 @@
 # ERD — Esquema BI_VIP_CENTER_FIT
 
 > Generado automáticamente por `scripts/erd.mjs` desde `prisma/schema.prisma`.
-> Modelos: 17. `PK` = clave primaria, `UK` = clave única.
+> Modelos: 16. `PK` = clave primaria, `UK` = clave única.
 >
 > **Arquitectura: Data Warehouse en constelación.** El modelo tiene 3 data mart por área
 > de negocio, cada uno una **estrella**, que **comparten las dimensiones conformadas** del
@@ -48,20 +48,9 @@ erDiagram
   }
   DimPlan {
     int sk_plan PK
-    int sk_plan_origen
-    int id_plan_bk UK
-    string nombre_plan
-    int duracion_dias
-    decimal precio_referencial
-    string categoria_duracion
-  }
-  DimPromocion {
-    int sk_promocion PK
-    int sk_promocion_origen
-    int id_promocion_bk UK
-    string nombre_promocion
-    string tipo_descuento
-    decimal valor_descuento
+    string tipo_plan
+    string tipo_operacion
+    string promocion
   }
   FactAsistencias {
     bigint sk_asistencia PK
@@ -101,7 +90,6 @@ erDiagram
     int id_membresia_bk UK
     int sk_cliente
     int sk_plan
-    int sk_promocion
     int sk_empleado
     int sk_fecha_inicio
     int sk_fecha_fin
@@ -151,7 +139,6 @@ erDiagram
     int sk_fecha_pago
     int sk_cliente
     int sk_plan
-    int sk_promocion
     int sk_empleado
     int id_membresia_bk
     decimal monto_neto
@@ -215,7 +202,6 @@ erDiagram
   FactMembresias }o--|| DimFecha : "sk_fecha_fin"
   FactMembresias }o--|| DimFecha : "sk_fecha_inicio"
   FactMembresias }o--|| DimPlan : "sk_plan"
-  FactMembresias }o--|| DimPromocion : "sk_promocion"
   FactObjetivos }o--|| DimCliente : "sk_cliente"
   FactObjetivos }o--|| DimFecha : "sk_fecha_inicio"
   FactReclamos }o--|| DimCliente : "sk_cliente"
@@ -228,7 +214,6 @@ erDiagram
   FactVentas }o--|| DimEmpleado : "sk_empleado"
   FactVentas }o--|| DimFecha : "sk_fecha_pago"
   FactVentas }o--|| DimPlan : "sk_plan"
-  FactVentas }o--|| DimPromocion : "sk_promocion"
   FactEvaluacionesProgramadas }o--|| DimCliente : "sk_cliente"
   FactEvaluacionesProgramadas }o--|| DimEmpleado : "sk_empleado"
   FactEvaluacionesProgramadas }o--|| DimFecha : "sk_fecha_programada"
@@ -336,7 +321,6 @@ erDiagram
     int id_membresia_bk UK
     int sk_cliente
     int sk_plan
-    int sk_promocion
     int sk_empleado
     int sk_fecha_inicio
     int sk_fecha_fin
@@ -363,7 +347,6 @@ erDiagram
     int sk_fecha_pago
     int sk_cliente
     int sk_plan
-    int sk_promocion
     int sk_empleado
     int id_membresia_bk
     decimal monto_neto
@@ -408,20 +391,9 @@ erDiagram
   }
   DimPlan {
     int sk_plan PK
-    int sk_plan_origen
-    int id_plan_bk UK
-    string nombre_plan
-    int duracion_dias
-    decimal precio_referencial
-    string categoria_duracion
-  }
-  DimPromocion {
-    int sk_promocion PK
-    int sk_promocion_origen
-    int id_promocion_bk UK
-    string nombre_promocion
-    string tipo_descuento
-    decimal valor_descuento
+    string tipo_plan
+    string tipo_operacion
+    string promocion
   }
   FactAvisos }o--|| DimCliente : "sk_cliente"
   FactAvisos }o--|| DimEmpleado : "sk_empleado"
@@ -431,7 +403,6 @@ erDiagram
   FactMembresias }o--|| DimFecha : "sk_fecha_fin"
   FactMembresias }o--|| DimFecha : "sk_fecha_inicio"
   FactMembresias }o--|| DimPlan : "sk_plan"
-  FactMembresias }o--|| DimPromocion : "sk_promocion"
   FactRenovaciones }o--|| DimCliente : "sk_cliente"
   FactRenovaciones }o--|| DimEmpleado : "sk_empleado"
   FactRenovaciones }o--|| DimFecha : "sk_fecha_renovacion"
@@ -439,7 +410,6 @@ erDiagram
   FactVentas }o--|| DimEmpleado : "sk_empleado"
   FactVentas }o--|| DimFecha : "sk_fecha_pago"
   FactVentas }o--|| DimPlan : "sk_plan"
-  FactVentas }o--|| DimPromocion : "sk_promocion"
 ```
 
 ## Data Mart: Entrenamiento
@@ -541,12 +511,9 @@ erDiagram
   }
   DimPlan {
     int sk_plan PK
-    int sk_plan_origen
-    int id_plan_bk UK
-    string nombre_plan
-    int duracion_dias
-    decimal precio_referencial
-    string categoria_duracion
+    string tipo_plan
+    string tipo_operacion
+    string promocion
   }
   FactAsistencias }o--|| DimCliente : "sk_cliente"
   FactAsistencias }o--|| DimEmpleado : "sk_empleado"
@@ -573,9 +540,9 @@ erDiagram
 | Atención y reclamos | FactReclamos | DimCliente, DimEmpleado, DimFecha |
 | Atención y reclamos | FactRetenciones | DimCliente, DimEmpleado, DimFecha |
 | Comercial — ventas y membresías | FactAvisos | DimCliente, DimEmpleado, DimFecha |
-| Comercial — ventas y membresías | FactMembresias | DimCliente, DimEmpleado, DimFecha, DimPlan, DimPromocion |
+| Comercial — ventas y membresías | FactMembresias | DimCliente, DimEmpleado, DimFecha, DimPlan |
 | Comercial — ventas y membresías | FactRenovaciones | DimCliente, DimEmpleado, DimFecha |
-| Comercial — ventas y membresías | FactVentas | DimCliente, DimEmpleado, DimFecha, DimPlan, DimPromocion |
+| Comercial — ventas y membresías | FactVentas | DimCliente, DimEmpleado, DimFecha, DimPlan |
 | Entrenamiento | FactAsistencias | DimCliente, DimEmpleado, DimFecha, DimPlan |
 | Entrenamiento | FactEvaluaciones | DimCliente, DimEmpleado, DimFecha |
 | Entrenamiento | FactObjetivos | DimCliente, DimFecha |

@@ -29,7 +29,8 @@ Tablas `stg.*` (misma forma que el origen, sin limpiar) + tabla de marca de agua
 `dbo.usp_Transformar_CargarDataMart` (en `DW`) lee **sólo las filas nuevas** del staging
 según `dbo.etl_control.ultimo_staging_id`, aplica las reglas de calidad (DNI, sexo, fechas,
 rangos, unidades) y hace **`MERGE` por clave de negocio** (upsert + borrados). Dimensiones
-antes que hechos (FK).
+antes que hechos (FK). Las filas que no resuelven su dimensión se descartan y quedan auditadas
+en `dq.RegistroRechazos` (ver [`CALIDAD.md`](CALIDAD.md); auditoría en `sql/12_reglas_calidad.sql`).
 
 ## 5. DataMart: un Data Warehouse en **constelación** con **3 data marts**
 
@@ -41,13 +42,12 @@ No son 3 datamarts aislados: es **un DW** cuyos 3 datamarts (estrellas) comparte
 | `dm_comercial` | Administración y Comercial | FactVentas, FactMembresias, FactRenovaciones, FactAvisos |
 | `dm_entrenamiento` | Entrenador | FactAsistencias, FactSesionesProgramadas, FactObjetivos, FactEvaluaciones, FactEvaluacionesProgramadas |
 | `dm_atencion` | Recepción | FactReclamos, FactRetenciones |
-| `dim` (compartido) | — | DimFecha, DimCliente, DimEmpleado, DimPlan, DimPromocion |
+| `dim` (compartido) | — | DimFecha, DimCliente, DimEmpleado, DimPlan |
 
 Las FK físicas hecho → dimensión están declaradas en el motor; `docs/ERD.md` es la vista UML
-de la constelación completa, y `docs/ERD_dm_*.md` la de cada data mart por separado
-(`npm run uml:entrenamiento|comercial|atencion`).
+de la constelación completa (`npm run uml`).
 
-Sobre el modelo, `sql/05_metricas_datamart.sql` publica **13 vistas** `dbo.DM_*` con las
+Sobre el modelo, `sql/05_metricas_datamart.sql` publica **16 vistas** `dbo.DM_*` con las
 métricas/indicadores/KPIs.
 
 ## 6. Actualización: cada 10 minutos

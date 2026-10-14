@@ -6,5 +6,10 @@
 - Wants APIs fully documented (per-consumer / per-actor), because they will build a frontend on top later. Confidence: 0.75
 - Prefers incremental data processing over full reloads (ETL should process only new/changed data, never reload everything). Confidence: 0.6
 - Models data warehouses as a single constellation of data marts sharing conformed dimensions. Confidence: 0.55
-- Likes to study the data model one data mart at a time, not just the whole constellation: wants a separate Prisma schema per data mart (dim + that mart) and a per-datamart Mermaid ERD, viewed in the VS Code preview. Confidence: 0.6
+- Prefers a single `prisma/schema.prisma` for the whole Data Warehouse instead of one Prisma schema per data mart, and no per-data-mart ERDs — documents the model in the README instead. Confidence: 0.7
+- Wants the DW to have exactly 4 conformed dimensions — DimFecha, DimCliente, DimEmpleado, DimPlan — where DimPlan unifies the 3 proposed "Plan" attributes (tipo de plan, tipo de operación, promoción); insists that attributes like promoción belong inside Plan, not as their own dimension, and that DimPromocion was correctly eliminated. Confidence: 0.85
+- Only accepts something as a dimension if it satisfies dimensional-modeling criteria; otherwise the attribute is folded into an existing conformed dimension ("no cumplía con los parámetros para serlo"). Confidence: 0.7
+- Asks for explicit "revisión crítica" of existing artifacts — wants flaws and gaps called out honestly, not a summary or validation. Confidence: 0.5
 - Separates environments explicitly: keeps dev tooling (npm/Prisma/UML, JMeter, dotnet seeder) on their local machine and only runs Docker/containers on the remote VM/host — expects the agent not to mix local-machine steps with server-side steps. Confidence: 0.6
+- Before starting a new deliverable (e.g. documentation), asks for a requirement-by-requirement status check of what the blueprint/spec asks versus what is already implemented, with exact locations — wants the gap confirmed first, not assumed. Confidence: 0.6
+- Expects a missing requirement to be both implemented and documented ("se debe hacer y documentar"), not merely described in docs. Confidence: 0.65

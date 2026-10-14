@@ -15,12 +15,12 @@ public record EmpleadoRequest(
     int? IdEmpleadoBk, string? Dni, string? NombreCompleto, string? Cargo, string? Area);
 
 public record MembresiaRequest(
-    int? IdMembresiaBk, int? SkCliente, int? SkPlan, int? SkPromocion, int? SkEmpleado,
+    int? IdMembresiaBk, int? SkCliente, int? SkPlan, int? SkEmpleado,
     int? SkFechaInicio, int? SkFechaFin, int? DuracionDias, decimal? PrecioFinal,
     bool? EsRenovacion, string? EstadoMembresia, int? DiasAnticipacionRenovacion);
 
 public record VentaRequest(
-    int? IdPagoBk, int? SkFechaPago, int? SkCliente, int? SkPlan, int? SkPromocion,
+    int? IdPagoBk, int? SkFechaPago, int? SkCliente, int? SkPlan,
     int? SkEmpleado, int? IdMembresiaBk, decimal? MontoNeto, decimal? DescuentoAplicado,
     decimal? PrecioLista, string? MetodoPago);
 
