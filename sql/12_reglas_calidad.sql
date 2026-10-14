@@ -9,7 +9,7 @@
     3) Validación de fechas y estados
     4) Cálculo de cohortes
     5) Carga incremental
-    6) Reglas de calidad (rechazos del ETL)
+    6) Reglas de calidad (imputaciones del ETL)
 
   Cada control debe devolver 0 filas si el Data Mart está limpio. El catálogo
   de reglas (ID, condición, severidad, acción) está en docs/CALIDAD.md.
@@ -18,20 +18,20 @@
 USE BI_VIP_CENTER_FIT_DW;
 GO
 
-/* Vista de resumen de rechazos por regla. */
-IF OBJECT_ID('dq.V_RechazosPorRegla', 'V') IS NOT NULL DROP VIEW dq.V_RechazosPorRegla;
+/* Vista de resumen de imputaciones por regla. */
+IF OBJECT_ID('dq.V_ImputacionesPorRegla', 'V') IS NOT NULL DROP VIEW dq.V_ImputacionesPorRegla;
 GO
-CREATE VIEW dq.V_RechazosPorRegla
+CREATE VIEW dq.V_ImputacionesPorRegla
 AS
 SELECT
     codigo_regla,
     entidad,
     campo,
     motivo,
-    COUNT(*) AS FilasRechazadas,
-    MIN(fecha_registro) AS PrimerRechazo,
-    MAX(fecha_registro) AS UltimoRechazo
-FROM dq.RegistroRechazos
+    COUNT(*) AS FilasImputadas,
+    MIN(fecha_registro) AS PrimeraImputacion,
+    MAX(fecha_registro) AS UltimaImputacion
+FROM dq.RegistroImputaciones
 GROUP BY codigo_regla, entidad, campo, motivo;
 GO
 
@@ -87,6 +87,15 @@ SELECT 'FEC-04 Hora de ingreso fuera de rango', COUNT(*) FROM dm_entrenamiento.F
 WHERE hora_ingreso IS NOT NULL AND (hora_ingreso < 5 OR hora_ingreso > 23);
 GO
 
+/* 3b) INTEGRIDAD REFERENCIAL: ninguna FK de hecho debe quedar NULL (imputadas a -1). */
+SELECT 'REF-01 FactVentas.sk_empleado NULL' AS Control, COUNT(*) AS Filas FROM dm_comercial.FactVentas WHERE sk_empleado IS NULL
+UNION ALL SELECT 'REF-02 FactMembresias.sk_empleado NULL', COUNT(*) FROM dm_comercial.FactMembresias WHERE sk_empleado IS NULL
+UNION ALL SELECT 'REF-03 FactAsistencias.sk_plan NULL', COUNT(*) FROM dm_entrenamiento.FactAsistencias WHERE sk_plan IS NULL
+UNION ALL SELECT 'REF-04 FactAsistencias.sk_empleado NULL', COUNT(*) FROM dm_entrenamiento.FactAsistencias WHERE sk_empleado IS NULL
+UNION ALL SELECT 'REF-05 FactSesionesProgramadas.sk_plan NULL', COUNT(*) FROM dm_entrenamiento.FactSesionesProgramadas WHERE sk_plan IS NULL
+UNION ALL SELECT 'REF-06 FactReclamos.sk_empleado NULL', COUNT(*) FROM dm_atencion.FactReclamos WHERE sk_empleado IS NULL;
+GO
+
 /* 4) CÁLCULO DE COHORTES: control de monotonía de la vista de gerencia. */
 SELECT
     Anio, MesNumero, Mes, ClientesActivosInicio, ClientesInicioActivosCierre,
@@ -104,8 +113,8 @@ FROM dbo.etl_control
 ORDER BY proceso;
 GO
 
-/* 6) REGLAS DE CALIDAD: filas rechazadas por el ETL (dq.RegistroRechazos). */
-SELECT codigo_regla, entidad, campo, motivo, FilasRechazadas, UltimoRechazo
-FROM dq.V_RechazosPorRegla
-ORDER BY FilasRechazadas DESC, codigo_regla;
+/* 6) REGLAS DE CALIDAD: imputaciones del ETL (dq.RegistroImputaciones). */
+SELECT codigo_regla, entidad, campo, motivo, FilasImputadas, UltimaImputacion
+FROM dq.V_ImputacionesPorRegla
+ORDER BY FilasImputadas DESC, codigo_regla;
 GO

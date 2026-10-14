@@ -30,6 +30,21 @@ public sealed class KpisController(KpiRepository repo) : ControllerBase
     public async Task<IActionResult> AvisosCobertura(CancellationToken ct)
         => Ok(await repo.AvisosCoberturaAsync(ct));
 
+    [HttpGet("comercial/promociones/ventas")]
+    [Tags("KPI - Administración y Comercial")]
+    public async Task<IActionResult> PromocionesVentas([FromQuery] int? desde, [FromQuery] int? hasta, [FromQuery] string? promocion, CancellationToken ct)
+        => Ok(await repo.ComercialPromocionesVentasAsync(desde, hasta, promocion, ct));
+
+    [HttpGet("comercial/promociones/membresias")]
+    [Tags("KPI - Administración y Comercial")]
+    public async Task<IActionResult> PromocionesMembresias([FromQuery] int? desde, [FromQuery] int? hasta, [FromQuery] string? promocion, CancellationToken ct)
+        => Ok(await repo.ComercialPromocionesMembresiasAsync(desde, hasta, promocion, ct));
+
+    [HttpGet("comercial/promociones/clientes")]
+    [Tags("KPI - Administración y Comercial")]
+    public async Task<IActionResult> PromocionesClientes([FromQuery] int? desde, [FromQuery] int? hasta, [FromQuery] string? promocion, CancellationToken ct)
+        => Ok(await repo.ComercialPromocionesClientesAsync(desde, hasta, promocion, ct));
+
     [HttpGet("atencion/reclamos")]
     [Tags("KPI - Recepción")]
     public async Task<IActionResult> Reclamos([FromQuery] int? desde, [FromQuery] int? hasta, [FromQuery] string? categoria, CancellationToken ct)

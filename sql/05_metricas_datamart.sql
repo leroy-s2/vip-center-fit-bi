@@ -28,6 +28,7 @@ WITH Periodos AS
         mes,
         MAX(nombre_mes) AS nombre_mes
     FROM dbo.DimFecha
+    WHERE anio >= 2000
     GROUP BY DATEFROMPARTS(anio, mes, 1), anio, mes
 ),
 Serie AS
@@ -81,6 +82,7 @@ WITH Periodos AS
         mes,
         MAX(nombre_mes) AS nombre_mes
     FROM dbo.DimFecha
+    WHERE anio >= 2000
     GROUP BY DATEFROMPARTS(anio, mes, 1), anio, mes
 ),
 ClientesInicio AS

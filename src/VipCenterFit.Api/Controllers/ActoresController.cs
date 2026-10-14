@@ -32,7 +32,10 @@ public sealed class ActoresController(KpiRepository repo) : ControllerBase
                     actor = "comercial",
                     titulo = "Planes y promociones",
                     planes = await repo.ComercialPlanAsync(desde, hasta, null, ct),
-                    avisosCobertura = await repo.AvisosCoberturaAsync(ct)
+                    avisosCobertura = await repo.AvisosCoberturaAsync(ct),
+                    promocionesVentas = await repo.ComercialPromocionesVentasAsync(desde, hasta, null, ct),
+                    promocionesMembresias = await repo.ComercialPromocionesMembresiasAsync(desde, hasta, null, ct),
+                    promocionesClientes = await repo.ComercialPromocionesClientesAsync(desde, hasta, null, ct)
                 });
 
             case "recepcion":

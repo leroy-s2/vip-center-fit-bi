@@ -35,6 +35,21 @@ public sealed class ODataKpisController(KpiRepository repo) : ODataController
     public IQueryable<AvisosCoberturaDto> AvisosCobertura() =>
         repo.AvisosCoberturaAsync().GetAwaiter().GetResult().AsQueryable();
 
+    [HttpGet("DM_Promociones_Ventas")]
+    [EnableQuery]
+    public IQueryable<PromocionesVentasDto> PromocionesVentas() =>
+        repo.ComercialPromocionesVentasAsync(null, null, null).GetAwaiter().GetResult().AsQueryable();
+
+    [HttpGet("DM_Promociones_Membresias")]
+    [EnableQuery]
+    public IQueryable<PromocionesMembresiasDto> PromocionesMembresias() =>
+        repo.ComercialPromocionesMembresiasAsync(null, null, null).GetAwaiter().GetResult().AsQueryable();
+
+    [HttpGet("DM_Promociones_Clientes")]
+    [EnableQuery]
+    public IQueryable<PromocionesClientesDto> PromocionesClientes() =>
+        repo.ComercialPromocionesClientesAsync(null, null, null).GetAwaiter().GetResult().AsQueryable();
+
     [HttpGet("DM_Atencion_Reclamos")]
     [EnableQuery]
     public IQueryable<AtencionReclamosDto> AtencionReclamos() =>

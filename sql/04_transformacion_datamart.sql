@@ -120,6 +120,42 @@ CREATE TABLE dim.DimPlan
 GO
 
 /* -----------------------------------------------------------------------------
+   Miembros centinela (-1): imputación de hechos que no resuelven su dimensión.
+   ----------------------------------------------------------------------------- */
+IF NOT EXISTS (SELECT 1 FROM dim.DimFecha WHERE sk_fecha = -1)
+    INSERT dim.DimFecha (sk_fecha, fecha, anio, trimestre, semestre, mes, nombre_mes, dia, dia_semana, es_fin_de_semana)
+    VALUES (-1, '1900-01-01', 1900, 1, 1, 1, 'Enero', 1, 'Lunes', 0);
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dim.DimCliente WHERE sk_cliente = -1)
+BEGIN
+    SET IDENTITY_INSERT dim.DimCliente ON;
+    INSERT dim.DimCliente (sk_cliente, sk_cliente_origen, id_cliente_bk, dni, nombre_completo, sexo, rango_etario,
+                           estado_cliente, fecha_registro_origen, fecha_inicio_validez, fecha_fin_validez, es_actual)
+    VALUES (-1, NULL, -1, NULL, 'CLIENTE NO IDENTIFICADO', 'X', NULL, 'INACTIVO', NULL, NULL, NULL, 1);
+    SET IDENTITY_INSERT dim.DimCliente OFF;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dim.DimEmpleado WHERE sk_empleado = -1)
+BEGIN
+    SET IDENTITY_INSERT dim.DimEmpleado ON;
+    INSERT dim.DimEmpleado (sk_empleado, sk_empleado_origen, id_empleado_bk, dni, nombre_completo, cargo, area)
+    VALUES (-1, NULL, -1, NULL, 'SIN EMPLEADO', 'NO ESPECIFICADO', 'NO ESPECIFICADO');
+    SET IDENTITY_INSERT dim.DimEmpleado OFF;
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dim.DimPlan WHERE sk_plan = -1)
+BEGIN
+    SET IDENTITY_INSERT dim.DimPlan ON;
+    INSERT dim.DimPlan (sk_plan, tipo_plan, tipo_operacion, promocion)
+    VALUES (-1, 'NO_APLICA', 'NO_ESPECIFICADO', 'SIN PROMOCION');
+    SET IDENTITY_INSERT dim.DimPlan OFF;
+END
+GO
+
+/* -----------------------------------------------------------------------------
    Hechos de cada data mart.
    ----------------------------------------------------------------------------- */
 IF OBJECT_ID('dm_comercial.FactVentas', 'U') IS NULL
@@ -130,7 +166,7 @@ CREATE TABLE dm_comercial.FactVentas
     sk_fecha_pago INT NOT NULL,
     sk_cliente INT NOT NULL,
     sk_plan INT NOT NULL,
-    sk_empleado INT NULL,
+    sk_empleado INT NOT NULL,
     id_membresia_bk INT NULL,
     monto_neto DECIMAL(12,2) NOT NULL,
     descuento_aplicado DECIMAL(12,2) NULL,
@@ -146,7 +182,7 @@ CREATE TABLE dm_comercial.FactMembresias
     id_membresia_bk INT NOT NULL UNIQUE,
     sk_cliente INT NOT NULL,
     sk_plan INT NOT NULL,
-    sk_empleado INT NULL,
+    sk_empleado INT NOT NULL,
     sk_fecha_inicio INT NOT NULL,
     sk_fecha_fin INT NOT NULL,
     duracion_dias INT NULL,
@@ -164,7 +200,7 @@ CREATE TABLE dm_comercial.FactRenovaciones
     id_renovacion_bk INT NOT NULL UNIQUE,
     sk_fecha_renovacion INT NOT NULL,
     sk_cliente INT NOT NULL,
-    sk_empleado INT NULL,
+    sk_empleado INT NOT NULL,
     id_membresia_anterior_bk INT NULL,
     id_membresia_nueva_bk INT NULL,
     dias_anticipacion INT NULL,
@@ -179,7 +215,7 @@ CREATE TABLE dm_comercial.FactAvisos
     id_aviso_bk INT NOT NULL UNIQUE,
     sk_fecha_aviso INT NOT NULL,
     sk_cliente INT NOT NULL,
-    sk_empleado INT NULL,
+    sk_empleado INT NOT NULL,
     id_membresia_bk INT NULL,
     dias_antes_vencimiento INT NULL,
     medio VARCHAR(30) NOT NULL,
@@ -194,8 +230,8 @@ CREATE TABLE dm_entrenamiento.FactAsistencias
     id_asistencia_bk INT NOT NULL UNIQUE,
     sk_fecha_asistencia INT NOT NULL,
     sk_cliente INT NOT NULL,
-    sk_plan INT NULL,
-    sk_empleado INT NULL,
+    sk_plan INT NOT NULL,
+    sk_empleado INT NOT NULL,
     hora_ingreso INT NULL,
     cantidad_asistencias INT NOT NULL
 );
@@ -223,7 +259,7 @@ CREATE TABLE dm_entrenamiento.FactEvaluaciones
     id_evaluacion_bk INT NOT NULL UNIQUE,
     sk_fecha_evaluacion INT NOT NULL,
     sk_cliente INT NOT NULL,
-    sk_empleado INT NULL,
+    sk_empleado INT NOT NULL,
     id_objetivo_bk INT NULL,
     peso DECIMAL(8,2) NULL,
     altura DECIMAL(8,2) NULL,
@@ -239,7 +275,7 @@ CREATE TABLE dm_atencion.FactReclamos
     id_reclamo_bk INT NOT NULL UNIQUE,
     sk_fecha_reclamo INT NOT NULL,
     sk_cliente INT NOT NULL,
-    sk_empleado INT NULL,
+    sk_empleado INT NOT NULL,
     categoria VARCHAR(60) NOT NULL,
     estado VARCHAR(30) NOT NULL,
     fecha_resolucion DATETIME2(7) NULL,
@@ -259,8 +295,8 @@ CREATE TABLE dm_entrenamiento.FactSesionesProgramadas
     id_sesion_bk INT NOT NULL UNIQUE,
     sk_fecha_programada INT NOT NULL,
     sk_cliente INT NOT NULL,
-    sk_plan INT NULL,
-    sk_empleado INT NULL,
+    sk_plan INT NOT NULL,
+    sk_empleado INT NOT NULL,
     tipo_sesion VARCHAR(40) NOT NULL,
     hora_programada INT NULL,
     estado_sesion VARCHAR(30) NOT NULL,
@@ -275,7 +311,7 @@ CREATE TABLE dm_entrenamiento.FactEvaluacionesProgramadas
     id_evaluacion_programada_bk INT NOT NULL UNIQUE,
     sk_fecha_programada INT NOT NULL,
     sk_cliente INT NOT NULL,
-    sk_empleado INT NULL,
+    sk_empleado INT NOT NULL,
     id_objetivo_bk INT NULL,
     tipo_evaluacion VARCHAR(40) NOT NULL,
     estado_evaluacion VARCHAR(30) NOT NULL,
@@ -290,13 +326,56 @@ CREATE TABLE dm_atencion.FactRetenciones
     id_retencion_bk INT NOT NULL UNIQUE,
     sk_fecha_retencion INT NOT NULL,
     sk_cliente INT NOT NULL,
-    sk_empleado INT NULL,
+    sk_empleado INT NOT NULL,
     id_membresia_bk INT NULL,
     canal VARCHAR(40) NOT NULL,
     motivo VARCHAR(60) NOT NULL,
     resultado VARCHAR(30) NOT NULL,
     monto_oferta DECIMAL(12,2) NULL
 );
+GO
+
+/* -----------------------------------------------------------------------------
+   FKs de hechos a centinelas: no se admiten NULL (imputación a -1).
+   ----------------------------------------------------------------------------- */
+UPDATE dm_comercial.FactVentas                    SET sk_empleado = -1 WHERE sk_empleado IS NULL;
+UPDATE dm_comercial.FactMembresias                SET sk_empleado = -1 WHERE sk_empleado IS NULL;
+UPDATE dm_comercial.FactRenovaciones              SET sk_empleado = -1 WHERE sk_empleado IS NULL;
+UPDATE dm_comercial.FactAvisos                    SET sk_empleado = -1 WHERE sk_empleado IS NULL;
+UPDATE dm_entrenamiento.FactAsistencias           SET sk_plan = -1 WHERE sk_plan IS NULL;
+UPDATE dm_entrenamiento.FactAsistencias           SET sk_empleado = -1 WHERE sk_empleado IS NULL;
+UPDATE dm_entrenamiento.FactSesionesProgramadas   SET sk_plan = -1 WHERE sk_plan IS NULL;
+UPDATE dm_entrenamiento.FactSesionesProgramadas   SET sk_empleado = -1 WHERE sk_empleado IS NULL;
+UPDATE dm_entrenamiento.FactEvaluaciones          SET sk_empleado = -1 WHERE sk_empleado IS NULL;
+UPDATE dm_entrenamiento.FactEvaluacionesProgramadas SET sk_empleado = -1 WHERE sk_empleado IS NULL;
+UPDATE dm_atencion.FactReclamos                   SET sk_empleado = -1 WHERE sk_empleado IS NULL;
+UPDATE dm_atencion.FactRetenciones                SET sk_empleado = -1 WHERE sk_empleado IS NULL;
+GO
+
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_comercial.FactVentas') AND name = 'sk_empleado' AND is_nullable = 1)
+    ALTER TABLE dm_comercial.FactVentas ALTER COLUMN sk_empleado INT NOT NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_comercial.FactMembresias') AND name = 'sk_empleado' AND is_nullable = 1)
+    ALTER TABLE dm_comercial.FactMembresias ALTER COLUMN sk_empleado INT NOT NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_comercial.FactRenovaciones') AND name = 'sk_empleado' AND is_nullable = 1)
+    ALTER TABLE dm_comercial.FactRenovaciones ALTER COLUMN sk_empleado INT NOT NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_comercial.FactAvisos') AND name = 'sk_empleado' AND is_nullable = 1)
+    ALTER TABLE dm_comercial.FactAvisos ALTER COLUMN sk_empleado INT NOT NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_entrenamiento.FactAsistencias') AND name = 'sk_plan' AND is_nullable = 1)
+    ALTER TABLE dm_entrenamiento.FactAsistencias ALTER COLUMN sk_plan INT NOT NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_entrenamiento.FactAsistencias') AND name = 'sk_empleado' AND is_nullable = 1)
+    ALTER TABLE dm_entrenamiento.FactAsistencias ALTER COLUMN sk_empleado INT NOT NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_entrenamiento.FactSesionesProgramadas') AND name = 'sk_plan' AND is_nullable = 1)
+    ALTER TABLE dm_entrenamiento.FactSesionesProgramadas ALTER COLUMN sk_plan INT NOT NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_entrenamiento.FactSesionesProgramadas') AND name = 'sk_empleado' AND is_nullable = 1)
+    ALTER TABLE dm_entrenamiento.FactSesionesProgramadas ALTER COLUMN sk_empleado INT NOT NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_entrenamiento.FactEvaluaciones') AND name = 'sk_empleado' AND is_nullable = 1)
+    ALTER TABLE dm_entrenamiento.FactEvaluaciones ALTER COLUMN sk_empleado INT NOT NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_entrenamiento.FactEvaluacionesProgramadas') AND name = 'sk_empleado' AND is_nullable = 1)
+    ALTER TABLE dm_entrenamiento.FactEvaluacionesProgramadas ALTER COLUMN sk_empleado INT NOT NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_atencion.FactReclamos') AND name = 'sk_empleado' AND is_nullable = 1)
+    ALTER TABLE dm_atencion.FactReclamos ALTER COLUMN sk_empleado INT NOT NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_atencion.FactRetenciones') AND name = 'sk_empleado' AND is_nullable = 1)
+    ALTER TABLE dm_atencion.FactRetenciones ALTER COLUMN sk_empleado INT NOT NULL;
 GO
 
 /* -----------------------------------------------------------------------------
@@ -331,10 +410,10 @@ IF NOT EXISTS (SELECT 1 FROM sys.schemas WHERE name = 'dq')
     EXEC('CREATE SCHEMA dq');
 GO
 
-IF OBJECT_ID('dq.RegistroRechazos', 'U') IS NULL
-CREATE TABLE dq.RegistroRechazos
+IF OBJECT_ID('dq.RegistroImputaciones', 'U') IS NULL
+CREATE TABLE dq.RegistroImputaciones
 (
-    id_rechazo     BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    id_imputacion  BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
     codigo_regla   VARCHAR(20) NOT NULL,
     entidad        VARCHAR(60) NOT NULL,
     campo          VARCHAR(60) NULL,
@@ -814,105 +893,105 @@ BEGIN
           AND fecha >= '2000-01-01' AND fecha <= '2100-12-31'
         GROUP BY sk_fecha_origen;
 
-        /* -------- CALIDAD: registrar las filas que se descartan --------
-           El ETL descarta las filas que no resuelven su dimensión conformada
-           (cliente o fecha). Aquí quedan auditables en dq.RegistroRechazos. */
-        ;WITH Rechazos AS
+        /* -------- CALIDAD: registrar imputaciones a centinelas --------
+           El hecho SIEMPRE se carga; si no resuelve cliente/fecha se imputa al
+           miembro centinela (-1) y la alerta queda en dq.RegistroImputaciones. */
+        ;WITH Imputaciones AS
         (
-            SELECT 'RC-12' AS codigo_regla, 'DimCliente' AS entidad, 'id_cliente_bk' AS campo,
+            SELECT 'IMP-01' AS codigo_regla, 'DimCliente' AS entidad, 'id_cliente_bk' AS campo,
                    c.StagingID AS staging_id, NULL AS bk, NULL AS valor,
-                   'Cliente sin clave de negocio (id_cliente_bk NULL)' AS motivo
+                   'Miembro excluido: cliente sin clave de negocio (id_cliente_bk NULL)' AS motivo
             FROM dbo.stg_clientes c
             WHERE c.StagingID > @DesdeCli AND c.StagingID <= @HastaCli AND c.id_cliente_bk IS NULL
             UNION ALL
-            SELECT 'RC-13', 'DimFecha', 'fecha', f.StagingID, NULL, CAST(f.fecha AS VARCHAR(200)),
-                   'Fecha fuera de rango [2000-01-01, 2100-12-31]'
+            SELECT 'IMP-02', 'DimFecha', 'fecha', f.StagingID, NULL, CAST(f.fecha AS VARCHAR(200)),
+                   'Miembro excluido: fecha fuera de rango [2000-01-01, 2100-12-31]'
             FROM dbo.stg_fecha f
             WHERE f.StagingID > @DesdeFecha AND f.StagingID <= @HastaFecha
               AND (f.fecha IS NULL OR f.fecha < '2000-01-01' OR f.fecha > '2100-12-31')
             UNION ALL
-            SELECT 'RC-14', 'FactVentas', 'sk_cliente', v.StagingID, CAST(v.id_pago_bk AS VARCHAR(40)),
-                   CAST(v.sk_cliente_origen AS VARCHAR(200)), 'Venta con sk_cliente inexistente en el origen'
+            SELECT 'IMP-03', 'FactVentas', 'sk_cliente', v.StagingID, CAST(v.id_pago_bk AS VARCHAR(40)),
+                   CAST(v.sk_cliente_origen AS VARCHAR(200)), 'Imputado al cliente centinela (-1)'
             FROM dbo.stg_ventas_membresias v
             LEFT JOIN #MapCliente mc ON mc.sk_cliente_origen = v.sk_cliente_origen
             WHERE v.EntidadOrigen = 'VENTA' AND v.id_pago_bk IS NOT NULL
               AND v.StagingID > @DesdeVM AND v.StagingID <= @HastaVM AND v.OperacionCDC IN (2, 4)
               AND (v.sk_cliente_origen IS NULL OR mc.id_cliente_bk IS NULL)
             UNION ALL
-            SELECT 'RC-15', 'FactVentas', 'sk_fecha_pago', v.StagingID, CAST(v.id_pago_bk AS VARCHAR(40)),
-                   CAST(v.sk_fecha_pago_origen AS VARCHAR(200)), 'Venta con sk_fecha_pago fuera de DimFecha'
+            SELECT 'IMP-04', 'FactVentas', 'sk_fecha_pago', v.StagingID, CAST(v.id_pago_bk AS VARCHAR(40)),
+                   CAST(v.sk_fecha_pago_origen AS VARCHAR(200)), 'Imputado a la fecha centinela (-1)'
             FROM dbo.stg_ventas_membresias v
             LEFT JOIN #MapFecha mf ON mf.sk_fecha_origen = v.sk_fecha_pago_origen
             WHERE v.EntidadOrigen = 'VENTA' AND v.id_pago_bk IS NOT NULL
               AND v.StagingID > @DesdeVM AND v.StagingID <= @HastaVM AND v.OperacionCDC IN (2, 4)
               AND mf.sk_fecha IS NULL
             UNION ALL
-            SELECT 'RC-16', 'FactMembresias', 'sk_cliente', m.StagingID, CAST(m.id_membresia_bk AS VARCHAR(40)),
-                   CAST(m.sk_cliente_origen AS VARCHAR(200)), 'Membresía con sk_cliente inexistente en el origen'
+            SELECT 'IMP-05', 'FactMembresias', 'sk_cliente', m.StagingID, CAST(m.id_membresia_bk AS VARCHAR(40)),
+                   CAST(m.sk_cliente_origen AS VARCHAR(200)), 'Imputado al cliente centinela (-1)'
             FROM dbo.stg_ventas_membresias m
             LEFT JOIN #MapCliente mc ON mc.sk_cliente_origen = m.sk_cliente_origen
             WHERE m.EntidadOrigen = 'MEMBRESIA' AND m.id_membresia_bk IS NOT NULL
               AND m.StagingID > @DesdeVM AND m.StagingID <= @HastaVM AND m.OperacionCDC IN (2, 4)
               AND (m.sk_cliente_origen IS NULL OR mc.id_cliente_bk IS NULL)
             UNION ALL
-            SELECT 'RC-17', 'FactMembresias', 'sk_fecha_inicio', m.StagingID, CAST(m.id_membresia_bk AS VARCHAR(40)),
-                   CAST(m.sk_fecha_inicio_origen AS VARCHAR(200)), 'Membresía con sk_fecha_inicio fuera de DimFecha'
+            SELECT 'IMP-06', 'FactMembresias', 'sk_fecha_inicio', m.StagingID, CAST(m.id_membresia_bk AS VARCHAR(40)),
+                   CAST(m.sk_fecha_inicio_origen AS VARCHAR(200)), 'Imputado a la fecha centinela (-1)'
             FROM dbo.stg_ventas_membresias m
             LEFT JOIN #MapFecha mfi ON mfi.sk_fecha_origen = m.sk_fecha_inicio_origen
             WHERE m.EntidadOrigen = 'MEMBRESIA' AND m.id_membresia_bk IS NOT NULL
               AND m.StagingID > @DesdeVM AND m.StagingID <= @HastaVM AND m.OperacionCDC IN (2, 4)
               AND mfi.sk_fecha IS NULL
             UNION ALL
-            SELECT 'RC-18', 'FactAsistencias', 'sk_cliente', a.StagingID, CAST(a.id_asistencia_bk AS VARCHAR(40)),
-                   CAST(a.sk_cliente_origen AS VARCHAR(200)), 'Asistencia con sk_cliente inexistente en el origen'
+            SELECT 'IMP-07', 'FactAsistencias', 'sk_cliente', a.StagingID, CAST(a.id_asistencia_bk AS VARCHAR(40)),
+                   CAST(a.sk_cliente_origen AS VARCHAR(200)), 'Imputado al cliente centinela (-1)'
             FROM dbo.stg_entrenamiento a
             LEFT JOIN #MapCliente mc ON mc.sk_cliente_origen = a.sk_cliente_origen
             WHERE a.EntidadOrigen = 'ASISTENCIA' AND a.id_asistencia_bk IS NOT NULL
               AND a.StagingID > @DesdeEnt AND a.StagingID <= @HastaEnt AND a.OperacionCDC IN (2, 4)
               AND (a.sk_cliente_origen IS NULL OR mc.id_cliente_bk IS NULL)
             UNION ALL
-            SELECT 'RC-19', 'FactAsistencias', 'sk_fecha_asistencia', a.StagingID, CAST(a.id_asistencia_bk AS VARCHAR(40)),
-                   CAST(a.sk_fecha_asistencia_origen AS VARCHAR(200)), 'Asistencia con sk_fecha fuera de DimFecha'
+            SELECT 'IMP-08', 'FactAsistencias', 'sk_fecha_asistencia', a.StagingID, CAST(a.id_asistencia_bk AS VARCHAR(40)),
+                   CAST(a.sk_fecha_asistencia_origen AS VARCHAR(200)), 'Imputado a la fecha centinela (-1)'
             FROM dbo.stg_entrenamiento a
             LEFT JOIN #MapFecha mf ON mf.sk_fecha_origen = a.sk_fecha_asistencia_origen
             WHERE a.EntidadOrigen = 'ASISTENCIA' AND a.id_asistencia_bk IS NOT NULL
               AND a.StagingID > @DesdeEnt AND a.StagingID <= @HastaEnt AND a.OperacionCDC IN (2, 4)
               AND mf.sk_fecha IS NULL
             UNION ALL
-            SELECT 'RC-20', 'FactReclamos', 'sk_cliente', r.StagingID, CAST(r.id_reclamo_bk AS VARCHAR(40)),
-                   CAST(r.sk_cliente_origen AS VARCHAR(200)), 'Reclamo con sk_cliente inexistente en el origen'
+            SELECT 'IMP-09', 'FactReclamos', 'sk_cliente', r.StagingID, CAST(r.id_reclamo_bk AS VARCHAR(40)),
+                   CAST(r.sk_cliente_origen AS VARCHAR(200)), 'Imputado al cliente centinela (-1)'
             FROM dbo.stg_atencion_reclamos r
             LEFT JOIN #MapCliente mc ON mc.sk_cliente_origen = r.sk_cliente_origen
             WHERE r.EntidadOrigen = 'RECLAMO' AND r.id_reclamo_bk IS NOT NULL
               AND r.StagingID > @DesdeRec AND r.StagingID <= @HastaRec AND r.OperacionCDC IN (2, 4)
               AND (r.sk_cliente_origen IS NULL OR mc.id_cliente_bk IS NULL)
             UNION ALL
-            SELECT 'RC-21', 'FactReclamos', 'sk_fecha_reclamo', r.StagingID, CAST(r.id_reclamo_bk AS VARCHAR(40)),
-                   CAST(r.sk_fecha_reclamo_origen AS VARCHAR(200)), 'Reclamo con sk_fecha fuera de DimFecha'
+            SELECT 'IMP-10', 'FactReclamos', 'sk_fecha_reclamo', r.StagingID, CAST(r.id_reclamo_bk AS VARCHAR(40)),
+                   CAST(r.sk_fecha_reclamo_origen AS VARCHAR(200)), 'Imputado a la fecha centinela (-1)'
             FROM dbo.stg_atencion_reclamos r
             LEFT JOIN #MapFecha mf ON mf.sk_fecha_origen = r.sk_fecha_reclamo_origen
             WHERE r.EntidadOrigen = 'RECLAMO' AND r.id_reclamo_bk IS NOT NULL
               AND r.StagingID > @DesdeRec AND r.StagingID <= @HastaRec AND r.OperacionCDC IN (2, 4)
               AND mf.sk_fecha IS NULL
             UNION ALL
-            SELECT 'RC-22', 'FactRetenciones', 'sk_cliente', rt.StagingID, CAST(rt.id_retencion_bk AS VARCHAR(40)),
-                   CAST(rt.sk_cliente_origen AS VARCHAR(200)), 'Retención con sk_cliente inexistente en el origen'
+            SELECT 'IMP-11', 'FactRetenciones', 'sk_cliente', rt.StagingID, CAST(rt.id_retencion_bk AS VARCHAR(40)),
+                   CAST(rt.sk_cliente_origen AS VARCHAR(200)), 'Imputado al cliente centinela (-1)'
             FROM dbo.stg_atencion_reclamos rt
             LEFT JOIN #MapCliente mc ON mc.sk_cliente_origen = rt.sk_cliente_origen
             WHERE rt.EntidadOrigen = 'RETENCION' AND rt.id_retencion_bk IS NOT NULL
               AND rt.StagingID > @DesdeRec AND rt.StagingID <= @HastaRec AND rt.OperacionCDC IN (2, 4)
               AND (rt.sk_cliente_origen IS NULL OR mc.id_cliente_bk IS NULL)
             UNION ALL
-            SELECT 'RC-23', 'FactRetenciones', 'sk_fecha_retencion', rt.StagingID, CAST(rt.id_retencion_bk AS VARCHAR(40)),
-                   CAST(rt.sk_fecha_retencion_origen AS VARCHAR(200)), 'Retención con sk_fecha fuera de DimFecha'
+            SELECT 'IMP-12', 'FactRetenciones', 'sk_fecha_retencion', rt.StagingID, CAST(rt.id_retencion_bk AS VARCHAR(40)),
+                   CAST(rt.sk_fecha_retencion_origen AS VARCHAR(200)), 'Imputado a la fecha centinela (-1)'
             FROM dbo.stg_atencion_reclamos rt
             LEFT JOIN #MapFecha mf ON mf.sk_fecha_origen = rt.sk_fecha_retencion_origen
             WHERE rt.EntidadOrigen = 'RETENCION' AND rt.id_retencion_bk IS NOT NULL
               AND rt.StagingID > @DesdeRec AND rt.StagingID <= @HastaRec AND rt.OperacionCDC IN (2, 4)
               AND mf.sk_fecha IS NULL
         )
-        INSERT INTO dq.RegistroRechazos (codigo_regla, entidad, campo, staging_id, bk, valor, motivo)
-        SELECT codigo_regla, entidad, campo, staging_id, bk, valor, motivo FROM Rechazos;
+        INSERT INTO dq.RegistroImputaciones (codigo_regla, entidad, campo, staging_id, bk, valor, motivo)
+        SELECT codigo_regla, entidad, campo, staging_id, bk, valor, motivo FROM Imputaciones;
 
         /* -------- HECHO VENTAS -------- */
         ;WITH VentaCanonica AS
@@ -929,8 +1008,8 @@ BEGIN
         (
             SELECT
                 v.id_pago_bk,
-                df.sk_fecha AS sk_fecha_pago,
-                c.sk_cliente, p.sk_plan, e.sk_empleado,
+                ISNULL(df.sk_fecha, -1) AS sk_fecha_pago,
+                ISNULL(c.sk_cliente, -1) AS sk_cliente, ISNULL(p.sk_plan, -1) AS sk_plan, ISNULL(e.sk_empleado, -1) AS sk_empleado,
                 v.id_membresia_bk,
                 CASE WHEN v.monto_neto IS NULL OR v.monto_neto < 0 THEN 0 ELSE v.monto_neto END AS monto_neto,
                 CASE WHEN v.descuento_aplicado >= 0 THEN v.descuento_aplicado END AS descuento_aplicado,
@@ -944,12 +1023,12 @@ BEGIN
                     ELSE 'NO ESPECIFICADO'
                 END AS metodo_pago
             FROM VentaCanonica v
-            INNER JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = v.sk_fecha_pago_origen
-            INNER JOIN dim.DimFecha df ON df.sk_fecha = mf0.sk_fecha
-            INNER JOIN #MapCliente mc ON mc.sk_cliente_origen = v.sk_cliente_origen
-            INNER JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
+            LEFT JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = v.sk_fecha_pago_origen
+            LEFT JOIN dim.DimFecha df ON df.sk_fecha = mf0.sk_fecha
+            LEFT JOIN #MapCliente mc ON mc.sk_cliente_origen = v.sk_cliente_origen
+            LEFT JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
             LEFT JOIN #PlanOrigen tp ON tp.sk_plan_origen = v.sk_plan_origen
-            INNER JOIN dim.DimPlan p ON p.tipo_plan = ISNULL(tp.tipo_plan, 'NO_APLICA')
+            LEFT JOIN dim.DimPlan p ON p.tipo_plan = ISNULL(tp.tipo_plan, 'NO_APLICA')
                                     AND p.tipo_operacion = 'VENTA'
                                     AND p.promocion = ISNULL(tp.promocion, 'SIN PROMOCION')
             LEFT JOIN #MapEmpleado me ON me.sk_empleado_origen = v.sk_empleado_origen
@@ -983,9 +1062,9 @@ BEGIN
         (
             SELECT
                 m.id_membresia_bk,
-                c.sk_cliente, p.sk_plan, e.sk_empleado,
-                di.sk_fecha AS sk_fecha_inicio,
-                df.sk_fecha AS sk_fecha_fin,
+                ISNULL(c.sk_cliente, -1) AS sk_cliente, ISNULL(p.sk_plan, -1) AS sk_plan, ISNULL(e.sk_empleado, -1) AS sk_empleado,
+                ISNULL(di.sk_fecha, -1) AS sk_fecha_inicio,
+                ISNULL(df.sk_fecha, -1) AS sk_fecha_fin,
                 CASE WHEN m.duracion_dias > 0 THEN m.duracion_dias END AS duracion_dias,
                 CASE WHEN m.precio_final >= 0 THEN m.precio_final END AS precio_final,
                 CASE WHEN m.es_renovacion = 1 THEN 1 ELSE 0 END AS es_renovacion,
@@ -997,14 +1076,14 @@ BEGIN
                 END AS estado_membresia,
                 CASE WHEN m.dias_anticipacion_renovacion BETWEEN 0 AND 30 THEN m.dias_anticipacion_renovacion END AS dias_anticipacion_renovacion
             FROM MembresiaCanonica m
-            INNER JOIN #MapFecha mfi ON mfi.sk_fecha_origen = m.sk_fecha_inicio_origen
-            INNER JOIN dim.DimFecha di ON di.sk_fecha = mfi.sk_fecha
-            INNER JOIN #MapFecha mff ON mff.sk_fecha_origen = m.sk_fecha_fin_origen
-            INNER JOIN dim.DimFecha df ON df.sk_fecha = mff.sk_fecha
-            INNER JOIN #MapCliente mc ON mc.sk_cliente_origen = m.sk_cliente_origen
-            INNER JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
+            LEFT JOIN #MapFecha mfi ON mfi.sk_fecha_origen = m.sk_fecha_inicio_origen
+            LEFT JOIN dim.DimFecha di ON di.sk_fecha = mfi.sk_fecha
+            LEFT JOIN #MapFecha mff ON mff.sk_fecha_origen = m.sk_fecha_fin_origen
+            LEFT JOIN dim.DimFecha df ON df.sk_fecha = mff.sk_fecha
+            LEFT JOIN #MapCliente mc ON mc.sk_cliente_origen = m.sk_cliente_origen
+            LEFT JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
             LEFT JOIN #PlanOrigen tp ON tp.sk_plan_origen = m.sk_plan_origen
-            INNER JOIN dim.DimPlan p ON p.tipo_plan = ISNULL(tp.tipo_plan, 'NO_APLICA')
+            LEFT JOIN dim.DimPlan p ON p.tipo_plan = ISNULL(tp.tipo_plan, 'NO_APLICA')
                                     AND p.tipo_operacion = 'MEMBRESIA'
                                     AND p.promocion = ISNULL(tp.promocion, 'SIN PROMOCION')
             LEFT JOIN #MapEmpleado me ON me.sk_empleado_origen = m.sk_empleado_origen
@@ -1038,16 +1117,16 @@ BEGIN
         (
             SELECT
                 r.id_renovacion_bk,
-                mf.sk_fecha AS sk_fecha_renovacion,
-                c.sk_cliente, e.sk_empleado,
+                ISNULL(mf.sk_fecha, -1) AS sk_fecha_renovacion,
+                ISNULL(c.sk_cliente, -1) AS sk_cliente, ISNULL(e.sk_empleado, -1) AS sk_empleado,
                 r.id_membresia_anterior_bk, r.id_membresia_nueva_bk,
                 CASE WHEN r.dias_anticipacion BETWEEN 0 AND 30 THEN r.dias_anticipacion END AS dias_anticipacion,
                 CASE WHEN r.monto_renovacion > 0 THEN r.monto_renovacion END AS monto
             FROM RenovacionCanonica r
-            INNER JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = r.sk_fecha_renovacion_origen
-            INNER JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
-            INNER JOIN #MapCliente mc ON mc.sk_cliente_origen = r.sk_cliente_origen
-            INNER JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
+            LEFT JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = r.sk_fecha_renovacion_origen
+            LEFT JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
+            LEFT JOIN #MapCliente mc ON mc.sk_cliente_origen = r.sk_cliente_origen
+            LEFT JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
             LEFT JOIN #MapEmpleado me ON me.sk_empleado_origen = r.sk_empleado_origen
             LEFT JOIN dim.DimEmpleado e ON e.id_empleado_bk = me.id_empleado_bk
             WHERE r.rn = 1
@@ -1078,8 +1157,8 @@ BEGIN
         (
             SELECT
                 a.id_aviso_bk,
-                mf.sk_fecha AS sk_fecha_aviso,
-                c.sk_cliente, e.sk_empleado,
+                ISNULL(mf.sk_fecha, -1) AS sk_fecha_aviso,
+                ISNULL(c.sk_cliente, -1) AS sk_cliente, ISNULL(e.sk_empleado, -1) AS sk_empleado,
                 a.id_membresia_bk,
                 CASE WHEN a.dias_antes_vencimiento BETWEEN 1 AND 30 THEN a.dias_antes_vencimiento END AS dias_antes_vencimiento,
                 CASE
@@ -1093,10 +1172,10 @@ BEGIN
                     ELSE 'NO CONFIRMADO'
                 END AS estado
             FROM AvisoCanonico a
-            INNER JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = a.sk_fecha_aviso_origen
-            INNER JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
-            INNER JOIN #MapCliente mc ON mc.sk_cliente_origen = a.sk_cliente_origen
-            INNER JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
+            LEFT JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = a.sk_fecha_aviso_origen
+            LEFT JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
+            LEFT JOIN #MapCliente mc ON mc.sk_cliente_origen = a.sk_cliente_origen
+            LEFT JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
             LEFT JOIN #MapEmpleado me ON me.sk_empleado_origen = a.sk_empleado_origen
             LEFT JOIN dim.DimEmpleado e ON e.id_empleado_bk = me.id_empleado_bk
             WHERE a.rn = 1
@@ -1127,15 +1206,15 @@ BEGIN
         (
             SELECT
                 a.id_asistencia_bk,
-                mf.sk_fecha AS sk_fecha_asistencia,
-                c.sk_cliente, p.sk_plan, e.sk_empleado,
+                ISNULL(mf.sk_fecha, -1) AS sk_fecha_asistencia,
+                ISNULL(c.sk_cliente, -1) AS sk_cliente, ISNULL(p.sk_plan, -1) AS sk_plan, ISNULL(e.sk_empleado, -1) AS sk_empleado,
                 CASE WHEN a.hora_ingreso BETWEEN 5 AND 23 THEN a.hora_ingreso END AS hora_ingreso,
                 CASE WHEN ISNULL(a.cantidad_asistencias, 0) > 0 THEN 1 ELSE 0 END AS cantidad_asistencias
             FROM AsistenciaCanonica a
-            INNER JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = a.sk_fecha_asistencia_origen
-            INNER JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
-            INNER JOIN #MapCliente mc ON mc.sk_cliente_origen = a.sk_cliente_origen
-            INNER JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
+            LEFT JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = a.sk_fecha_asistencia_origen
+            LEFT JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
+            LEFT JOIN #MapCliente mc ON mc.sk_cliente_origen = a.sk_cliente_origen
+            LEFT JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
             LEFT JOIN #PlanOrigen tp ON tp.sk_plan_origen = a.sk_plan_origen
             LEFT JOIN dim.DimPlan p ON a.sk_plan_origen IS NOT NULL
                                    AND p.tipo_plan = ISNULL(tp.tipo_plan, 'NO_APLICA')
@@ -1168,8 +1247,8 @@ BEGIN
         (
             SELECT
                 o.id_objetivo_bk,
-                mf.sk_fecha AS sk_fecha_inicio,
-                c.sk_cliente,
+                ISNULL(mf.sk_fecha, -1) AS sk_fecha_inicio,
+                ISNULL(c.sk_cliente, -1) AS sk_cliente,
                 CASE
                     WHEN UPPER(REPLACE(REPLACE(LTRIM(RTRIM(o.tipo_objetivo)), ' ', '_'), 'DE_', '')) LIKE 'AUMENTO%MASA%' THEN 'AUMENTO_MASA'
                     WHEN UPPER(REPLACE(REPLACE(LTRIM(RTRIM(o.tipo_objetivo)), ' ', '_'), 'DE_', '')) LIKE 'REDUCCION%GRASA%' THEN 'REDUCCION_GRASA'
@@ -1198,10 +1277,10 @@ BEGIN
                     ELSE 'NO ESPECIFICADO'
                 END AS estado
             FROM ObjetivoCanonico o
-            INNER JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = o.sk_fecha_inicio_origen
-            INNER JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
-            INNER JOIN #MapCliente mc ON mc.sk_cliente_origen = o.sk_cliente_origen
-            INNER JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
+            LEFT JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = o.sk_fecha_inicio_origen
+            LEFT JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
+            LEFT JOIN #MapCliente mc ON mc.sk_cliente_origen = o.sk_cliente_origen
+            LEFT JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
             WHERE o.rn = 1
         ) AS s
         ON t.id_objetivo_bk = s.id_objetivo_bk
@@ -1227,8 +1306,8 @@ BEGIN
         (
             SELECT
                 ev.id_evaluacion_bk,
-                mf.sk_fecha AS sk_fecha_evaluacion,
-                c.sk_cliente, e.sk_empleado, ev.id_objetivo_bk,
+                ISNULL(mf.sk_fecha, -1) AS sk_fecha_evaluacion,
+                ISNULL(c.sk_cliente, -1) AS sk_cliente, ISNULL(e.sk_empleado, -1) AS sk_empleado, ev.id_objetivo_bk,
                 CASE
                     WHEN ev.peso BETWEEN 20 AND 200 THEN ev.peso
                     WHEN ev.peso BETWEEN 200 AND 300 THEN ev.peso / 2.2
@@ -1240,10 +1319,10 @@ BEGIN
                 CASE WHEN ev.grasa_corporal BETWEEN 0 AND 100 THEN ev.grasa_corporal END AS grasa_corporal,
                 CASE WHEN ev.masa_muscular > 0 AND ev.masa_muscular <= ISNULL(ev.peso, ev.masa_muscular) THEN ev.masa_muscular END AS masa_muscular
             FROM EvaluacionCanonica ev
-            INNER JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = ev.sk_fecha_evaluacion_origen
-            INNER JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
-            INNER JOIN #MapCliente mc ON mc.sk_cliente_origen = ev.sk_cliente_origen
-            INNER JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
+            LEFT JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = ev.sk_fecha_evaluacion_origen
+            LEFT JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
+            LEFT JOIN #MapCliente mc ON mc.sk_cliente_origen = ev.sk_cliente_origen
+            LEFT JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
             LEFT JOIN #MapEmpleado me ON me.sk_empleado_origen = ev.sk_empleado_origen
             LEFT JOIN dim.DimEmpleado e ON e.id_empleado_bk = me.id_empleado_bk
             WHERE ev.rn = 1
@@ -1274,8 +1353,8 @@ BEGIN
         (
             SELECT
                 r.id_reclamo_bk,
-                df.sk_fecha AS sk_fecha_reclamo,
-                c.sk_cliente, e.sk_empleado,
+                ISNULL(df.sk_fecha, -1) AS sk_fecha_reclamo,
+                ISNULL(c.sk_cliente, -1) AS sk_cliente, ISNULL(e.sk_empleado, -1) AS sk_empleado,
                 CASE
                     WHEN UPPER(LTRIM(RTRIM(r.categoria))) LIKE '%COBR%' THEN 'COBRO'
                     WHEN UPPER(LTRIM(RTRIM(r.categoria))) LIKE '%SERV%' THEN 'SERVICIO'
@@ -1295,10 +1374,10 @@ BEGIN
                     ELSE NULL
                 END AS resuelto_en_mostrador
             FROM ReclamoCanonico r
-            INNER JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = r.sk_fecha_reclamo_origen
-            INNER JOIN dim.DimFecha df ON df.sk_fecha = mf0.sk_fecha
-            INNER JOIN #MapCliente mc ON mc.sk_cliente_origen = r.sk_cliente_origen
-            INNER JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
+            LEFT JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = r.sk_fecha_reclamo_origen
+            LEFT JOIN dim.DimFecha df ON df.sk_fecha = mf0.sk_fecha
+            LEFT JOIN #MapCliente mc ON mc.sk_cliente_origen = r.sk_cliente_origen
+            LEFT JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
             LEFT JOIN #MapEmpleado me ON me.sk_empleado_origen = r.sk_empleado_origen
             LEFT JOIN dim.DimEmpleado e ON e.id_empleado_bk = me.id_empleado_bk
             WHERE r.rn = 1
@@ -1327,8 +1406,8 @@ BEGIN
         (
             SELECT
                 s.id_sesion_bk,
-                mf.sk_fecha AS sk_fecha_programada,
-                c.sk_cliente, p.sk_plan, e.sk_empleado,
+                ISNULL(mf.sk_fecha, -1) AS sk_fecha_programada,
+                ISNULL(c.sk_cliente, -1) AS sk_cliente, ISNULL(p.sk_plan, -1) AS sk_plan, ISNULL(e.sk_empleado, -1) AS sk_empleado,
                 CASE
                     WHEN UPPER(LTRIM(RTRIM(s.tipo_sesion))) LIKE 'ENTREN%' THEN 'ENTRENAMIENTO'
                     WHEN UPPER(LTRIM(RTRIM(s.tipo_sesion))) LIKE 'CLASE%' THEN 'CLASE_GRUPAL'
@@ -1344,10 +1423,10 @@ BEGIN
                 END AS estado_sesion,
                 CASE WHEN s.duracion_minutos BETWEEN 1 AND 480 THEN s.duracion_minutos END AS duracion_minutos
             FROM SesionProgramadaCanonica s
-            INNER JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = s.sk_fecha_programada_origen
-            INNER JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
-            INNER JOIN #MapCliente mc ON mc.sk_cliente_origen = s.sk_cliente_origen
-            INNER JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
+            LEFT JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = s.sk_fecha_programada_origen
+            LEFT JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
+            LEFT JOIN #MapCliente mc ON mc.sk_cliente_origen = s.sk_cliente_origen
+            LEFT JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
             LEFT JOIN #PlanOrigen tp ON tp.sk_plan_origen = s.sk_plan_origen
             LEFT JOIN dim.DimPlan p ON s.sk_plan_origen IS NOT NULL
                                    AND p.tipo_plan = ISNULL(tp.tipo_plan, 'NO_APLICA')
@@ -1383,8 +1462,8 @@ BEGIN
         (
             SELECT
                 ep.id_evaluacion_programada_bk,
-                mf.sk_fecha AS sk_fecha_programada,
-                c.sk_cliente, e.sk_empleado,
+                ISNULL(mf.sk_fecha, -1) AS sk_fecha_programada,
+                ISNULL(c.sk_cliente, -1) AS sk_cliente, ISNULL(e.sk_empleado, -1) AS sk_empleado,
                 CASE WHEN o.id_objetivo_bk IS NOT NULL THEN ep.id_objetivo_bk END AS id_objetivo_bk,
                 CASE
                     WHEN UPPER(LTRIM(RTRIM(ep.tipo_evaluacion))) LIKE 'FIS%' THEN 'FISICA'
@@ -1400,10 +1479,10 @@ BEGIN
                 END AS estado_evaluacion,
                 CASE WHEN ev.id_evaluacion_bk IS NOT NULL THEN ep.id_evaluacion_bk END AS id_evaluacion_bk
             FROM EvaluacionProgramadaCanonica ep
-            INNER JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = ep.sk_fecha_programada_origen
-            INNER JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
-            INNER JOIN #MapCliente mc ON mc.sk_cliente_origen = ep.sk_cliente_origen
-            INNER JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
+            LEFT JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = ep.sk_fecha_programada_origen
+            LEFT JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
+            LEFT JOIN #MapCliente mc ON mc.sk_cliente_origen = ep.sk_cliente_origen
+            LEFT JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
             LEFT JOIN #MapEmpleado me ON me.sk_empleado_origen = ep.sk_empleado_origen
             LEFT JOIN dim.DimEmpleado e ON e.id_empleado_bk = me.id_empleado_bk
             LEFT JOIN dm_entrenamiento.FactObjetivos o ON o.id_objetivo_bk = ep.id_objetivo_bk
@@ -1436,8 +1515,8 @@ BEGIN
         (
             SELECT
                 r.id_retencion_bk,
-                mf.sk_fecha AS sk_fecha_retencion,
-                c.sk_cliente, e.sk_empleado,
+                ISNULL(mf.sk_fecha, -1) AS sk_fecha_retencion,
+                ISNULL(c.sk_cliente, -1) AS sk_cliente, ISNULL(e.sk_empleado, -1) AS sk_empleado,
                 r.id_membresia_bk,
                 CASE
                     WHEN UPPER(LTRIM(RTRIM(r.canal))) LIKE '%MOSTRADOR%' THEN 'MOSTRADOR'
@@ -1460,10 +1539,10 @@ BEGIN
                 END AS resultado,
                 CASE WHEN r.monto_oferta > 0 THEN r.monto_oferta END AS monto_oferta
             FROM RetencionCanonica r
-            INNER JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = r.sk_fecha_retencion_origen
-            INNER JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
-            INNER JOIN #MapCliente mc ON mc.sk_cliente_origen = r.sk_cliente_origen
-            INNER JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
+            LEFT JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = r.sk_fecha_retencion_origen
+            LEFT JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
+            LEFT JOIN #MapCliente mc ON mc.sk_cliente_origen = r.sk_cliente_origen
+            LEFT JOIN dim.DimCliente c ON c.id_cliente_bk = mc.id_cliente_bk
             LEFT JOIN #MapEmpleado me ON me.sk_empleado_origen = r.sk_empleado_origen
             LEFT JOIN dim.DimEmpleado e ON e.id_empleado_bk = me.id_empleado_bk
             WHERE r.rn = 1
@@ -1646,7 +1725,7 @@ DELETE FROM dim.DimPlan;
 DELETE FROM dim.DimEmpleado;
 DELETE FROM dim.DimCliente;
 DELETE FROM dim.DimFecha;
-DELETE FROM dq.RegistroRechazos;
+DELETE FROM dq.RegistroImputaciones;
 UPDATE dbo.etl_control SET ultimo_staging_id = 0, ultima_carga = NULL, filas_ultima_carga = NULL;
 GO
 

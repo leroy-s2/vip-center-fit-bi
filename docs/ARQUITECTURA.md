@@ -29,8 +29,9 @@ Tablas `stg.*` (misma forma que el origen, sin limpiar) + tabla de marca de agua
 `dbo.usp_Transformar_CargarDataMart` (en `DW`) lee **sólo las filas nuevas** del staging
 según `dbo.etl_control.ultimo_staging_id`, aplica las reglas de calidad (DNI, sexo, fechas,
 rangos, unidades) y hace **`MERGE` por clave de negocio** (upsert + borrados). Dimensiones
-antes que hechos (FK). Las filas que no resuelven su dimensión se descartan y quedan auditadas
-en `dq.RegistroRechazos` (ver [`CALIDAD.md`](CALIDAD.md); auditoría en `sql/12_reglas_calidad.sql`).
+antes que hechos (FK). Las filas que no resuelven su dimensión **no se descartan**: se imputan al
+**miembro centinela `-1`** y quedan auditadas en `dq.RegistroImputaciones` (ver
+[`CALIDAD.md`](CALIDAD.md); auditoría en `sql/12_reglas_calidad.sql`).
 
 ## 5. DataMart: un Data Warehouse en **constelación** con **3 data marts**
 

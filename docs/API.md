@@ -69,6 +69,9 @@ Filtros comunes por querystring: `desde`/`hasta` (año), `plan`, `categoria`, `s
 | `GET /api/v1/kpis/ventas` | `DM_Ventas_Gerencia` | Gerencia General |
 | `GET /api/v1/kpis/comercial/planes` | `DM_Comercial_Plan` | Administración y Comercial |
 | `GET /api/v1/kpis/comercial/avisos-cobertura` | `DM_Avisos_Cobertura` | Administración y Comercial |
+| `GET /api/v1/kpis/comercial/promociones/ventas` | `DM_Promociones_Ventas` | Administración y Comercial |
+| `GET /api/v1/kpis/comercial/promociones/membresias` | `DM_Promociones_Membresias` | Administración y Comercial |
+| `GET /api/v1/kpis/comercial/promociones/clientes` | `DM_Promociones_Clientes` | Administración y Comercial |
 | `GET /api/v1/kpis/atencion/reclamos` | `DM_Atencion_Reclamos` | Recepción |
 | `GET /api/v1/kpis/atencion/recepcion` | `DM_Atencion_Recepcion` | Recepción |
 | `GET /api/v1/kpis/atencion/retencion` | `DM_Atencion_Retencion` | Recepción |
@@ -101,7 +104,8 @@ GET /odata/$metadata
 ```
 
 Entity sets: `DM_Gerencia_Ingresos`, `DM_Gerencia_Membresias`, `DM_Comercial_Plan`,
-`DM_Avisos_Cobertura`, `DM_Atencion_Reclamos`, `DM_Atencion_Recepcion`, `DM_Atencion_Retencion`,
+`DM_Avisos_Cobertura`, `DM_Promociones_Ventas`, `DM_Promociones_Membresias`,
+`DM_Promociones_Clientes`, `DM_Atencion_Reclamos`, `DM_Atencion_Recepcion`, `DM_Atencion_Retencion`,
 `DM_Entrenamiento_Asistencia`, `DM_Entrenamiento_Progreso`, `DM_Entrenamiento_Cumplimiento`,
 `DM_Entrenamiento_Evaluaciones`, `DM_Ventas_Gerencia`, `DM_Rutinas_Entrenador`.
 

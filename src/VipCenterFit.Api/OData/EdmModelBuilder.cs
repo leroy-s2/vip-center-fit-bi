@@ -18,6 +18,9 @@ public static class EdmModelBuilder
         AddSet<GerenciaMembresiasDto>(builder, "DM_Gerencia_Membresias");
         AddSet<ComercialPlanDto>(builder, "DM_Comercial_Plan");
         AddSet<AvisosCoberturaDto>(builder, "DM_Avisos_Cobertura");
+        AddSet<PromocionesVentasDto>(builder, "DM_Promociones_Ventas");
+        AddSet<PromocionesMembresiasDto>(builder, "DM_Promociones_Membresias");
+        AddSet<PromocionesClientesDto>(builder, "DM_Promociones_Clientes");
         AddSet<AtencionReclamosDto>(builder, "DM_Atencion_Reclamos");
         AddSet<EntrenamientoAsistenciaDto>(builder, "DM_Entrenamiento_Asistencia");
         AddSet<EntrenamientoProgresoDto>(builder, "DM_Entrenamiento_Progreso");

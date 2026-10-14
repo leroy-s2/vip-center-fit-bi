@@ -80,6 +80,18 @@ public record AtencionRecepcionDto(
     string? RangoEtario, string Cliente, string CategoriaAtencion,
     string EstadoAtencion, int TotalAtenciones) : IKpiRow;
 
+public record PromocionesVentasDto(
+    string RowKey, int Anio, int MesNumero, string Mes, string TipoPlan, string Promocion,
+    decimal IngresosPorPromocion, int VentasPorPromocion, decimal? DescuentoOtorgado) : IKpiRow;
+
+public record PromocionesMembresiasDto(
+    string RowKey, int Anio, int MesNumero, string Mes, string Promocion, string? Empleado,
+    int MembresiasVendidas, int MembresiasRenovadas) : IKpiRow;
+
+public record PromocionesClientesDto(
+    string RowKey, int Anio, int MesNumero, string Mes, string Promocion, string? Sexo,
+    string? RangoEtario, int ClientesCaptados) : IKpiRow;
+
 public record EtlEstadoDto(
     string Origen, string? UltimoLsnCdc, DateTime? UltimaCargaCdc, long? FilasUltimaCargaCdc,
     List<EtlMarcaAguaDto> MarcasEtl);

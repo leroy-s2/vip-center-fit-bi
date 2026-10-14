@@ -123,4 +123,28 @@ public sealed class KpiRepository(DbConnectionFactory factory)
             {FiltroAnio} AND (@Canal IS NULL OR v.Canal = @Canal) AND (@SkCliente IS NULL OR v.sk_cliente = @SkCliente)
             ORDER BY v.Anio, v.MesNumero, v.sk_cliente
             """, new { DesdeAnio = desdeAnio, HastaAnio = hastaAnio, Canal = canal, SkCliente = skCliente }, ct);
+
+    public Task<IReadOnlyList<PromocionesVentasDto>> ComercialPromocionesVentasAsync(int? desdeAnio, int? hastaAnio, string? promocion, CancellationToken ct = default) =>
+        QueryAsync<PromocionesVentasDto>($"""
+            SELECT CONCAT_WS('|', v.Anio, v.MesNumero, v.TipoPlan, v.Promocion) AS RowKey, v.*
+            FROM dbo.DM_Promociones_Ventas v
+            {FiltroAnio} AND (@Promocion IS NULL OR v.Promocion = @Promocion)
+            ORDER BY v.Anio, v.MesNumero, v.Promocion
+            """, new { DesdeAnio = desdeAnio, HastaAnio = hastaAnio, Promocion = promocion }, ct);
+
+    public Task<IReadOnlyList<PromocionesMembresiasDto>> ComercialPromocionesMembresiasAsync(int? desdeAnio, int? hastaAnio, string? promocion, CancellationToken ct = default) =>
+        QueryAsync<PromocionesMembresiasDto>($"""
+            SELECT CONCAT_WS('|', v.Anio, v.MesNumero, v.Promocion, v.Empleado) AS RowKey, v.*
+            FROM dbo.DM_Promociones_Membresias v
+            {FiltroAnio} AND (@Promocion IS NULL OR v.Promocion = @Promocion)
+            ORDER BY v.Anio, v.MesNumero, v.Promocion
+            """, new { DesdeAnio = desdeAnio, HastaAnio = hastaAnio, Promocion = promocion }, ct);
+
+    public Task<IReadOnlyList<PromocionesClientesDto>> ComercialPromocionesClientesAsync(int? desdeAnio, int? hastaAnio, string? promocion, CancellationToken ct = default) =>
+        QueryAsync<PromocionesClientesDto>($"""
+            SELECT CONCAT_WS('|', v.Anio, v.MesNumero, v.Promocion, v.Sexo, v.RangoEtario) AS RowKey, v.*
+            FROM dbo.DM_Promociones_Clientes v
+            {FiltroAnio} AND (@Promocion IS NULL OR v.Promocion = @Promocion)
+            ORDER BY v.Anio, v.MesNumero, v.Promocion
+            """, new { DesdeAnio = desdeAnio, HastaAnio = hastaAnio, Promocion = promocion }, ct);
 }

@@ -3,9 +3,9 @@
 Catálogo de las **reglas de calidad** aplicadas en la Etapa 4 (transformación y carga del
 Data Mart), su severidad y la acción que ejecuta el ETL. Se complementa con:
 
-- `sql/04_transformacion_datamart.sql` → aplica las reglas (corrige o descarta).
+- `sql/04_transformacion_datamart.sql` → aplica las reglas (corrige o imputa al centinela `-1`).
 - `sql/12_reglas_calidad.sql` → **queries de auditoría** que detectan violaciones sobre el DW.
-- `dq.RegistroRechazos` (esquema `dq`) → bitácora de las filas que el ETL **descarta**.
+- `dq.RegistroImputaciones` (esquema `dq`) → bitácora de las imputaciones a miembros centinela.
 
 Severidades: **Alta** (afecta integridad/imputación de hechos) · **Media** (calidad analítica) ·
 **Baja** (cosmética/consistencia).
@@ -32,41 +32,49 @@ Severidades: **Alta** (afecta integridad/imputación de hechos) · **Media** (ca
 
 ---
 
-## 2. Reglas de rechazo (descartan la fila y **quedan auditadas**)
+## 2. Reglas de imputación (el hecho **siempre entra**)
 
-Se registran en `dq.RegistroRechazos`. La fila **no se carga** en el Data Mart porque no
-resuelve su dimensión conformada.
+**En un Data Warehouse no se descarta dinero.** Si un hecho no resuelve su dimensión
+conformada, se **imputa a un miembro centinela** y se dispara una **alerta**; la fila queda
+cargada. Las imputaciones se registran en `dq.RegistroImputaciones`.
+
+**Miembros centinela (`-1`):** `DimCliente` → `CLIENTE NO IDENTIFICADO`, `DimEmpleado` →
+`SIN EMPLEADO`, `DimPlan` → `NO_APLICA/NO_ESPECIFICADO/SIN PROMOCION`, `DimFecha` → `1900-01-01`
+(fecha desconocida).
 
 | ID | Entidad | Campo | Condición | Acción |
 | :--- | :--- | :--- | :--- | :--- |
-| RC-12 | `DimCliente` | `id_cliente_bk` | `NULL` | Descarta el cliente |
-| RC-13 | `DimFecha` | `fecha` | `NULL` o fuera de `[2000-01-01, 2100-12-31]` | Descarta la fecha |
-| RC-14 | `FactVentas` | `sk_cliente` | No resuelve en `DimCliente` | Descarta la venta |
-| RC-15 | `FactVentas` | `sk_fecha_pago` | No resuelve en `DimFecha` | Descarta la venta |
-| RC-16 | `FactMembresias` | `sk_cliente` | No resuelve | Descarta la membresía |
-| RC-17 | `FactMembresias` | `sk_fecha_inicio` | No resuelve | Descarta la membresía |
-| RC-18 | `FactAsistencias` | `sk_cliente` | No resuelve | Descarta la asistencia |
-| RC-19 | `FactAsistencias` | `sk_fecha_asistencia` | No resuelve | Descarta la asistencia |
-| RC-20 | `FactReclamos` | `sk_cliente` | No resuelve | Descarta el reclamo |
-| RC-21 | `FactReclamos` | `sk_fecha_reclamo` | No resuelve | Descarta el reclamo |
-| RC-22 | `FactRetenciones` | `sk_cliente` | No resuelve | Descarta la retención |
-| RC-23 | `FactRetenciones` | `sk_fecha_retencion` | No resuelve | Descarta la retención |
+| IMP-01 | `DimCliente` | `id_cliente_bk` | `NULL` | Miembro excluido (no forma dimensión) |
+| IMP-02 | `DimFecha` | `fecha` | `NULL` o fuera de `[2000-01-01, 2100-12-31]` | Miembro excluido |
+| IMP-03 | `FactVentas` | `sk_cliente` | No resuelve | Imputa `sk_cliente = -1` + alerta |
+| IMP-04 | `FactVentas` | `sk_fecha_pago` | No resuelve | Imputa `-1` + alerta |
+| IMP-05 | `FactMembresias` | `sk_cliente` | No resuelve | Imputa `-1` + alerta |
+| IMP-06 | `FactMembresias` | `sk_fecha_inicio` | No resuelve | Imputa `-1` + alerta |
+| IMP-07 | `FactAsistencias` | `sk_cliente` | No resuelve | Imputa `-1` + alerta |
+| IMP-08 | `FactAsistencias` | `sk_fecha_asistencia` | No resuelve | Imputa `-1` + alerta |
+| IMP-09 | `FactReclamos` | `sk_cliente` | No resuelve | Imputa `-1` + alerta |
+| IMP-10 | `FactReclamos` | `sk_fecha_reclamo` | No resuelve | Imputa `-1` + alerta |
+| IMP-11 | `FactRetenciones` | `sk_cliente` | No resuelve | Imputa `-1` + alerta |
+| IMP-12 | `FactRetenciones` | `sk_fecha_retencion` | No resuelve | Imputa `-1` + alerta |
 
-### Bitácora `dq.RegistroRechazos`
+Las FK de hechos a empleado/plan (`sk_empleado`, `sk_plan`) son **`NOT NULL`** y también se
+imputan al centinela cuando no resuelven.
+
+### Bitácora `dq.RegistroImputaciones`
 
 | Columna | Descripción |
 | :--- | :--- |
-| `id_rechazo` | PK autogenerada |
-| `codigo_regla` | ID de la regla (RC-*) |
+| `id_imputacion` | PK autogenerada |
+| `codigo_regla` | ID de la regla (IMP-*) |
 | `entidad` | Tabla de hechos/dimensión afectada |
 | `campo` | Columna que no resolvió |
-| `staging_id` | Fila de staging que originó el rechazo (trazabilidad) |
+| `staging_id` | Fila de staging que originó la imputación (trazabilidad) |
 | `bk` | Clave de negocio (p. ej. `id_pago_bk`) |
-| `valor` | Valor rechazado |
+| `valor` | Valor imputado |
 | `motivo` | Descripción legible |
-| `fecha_registro` | Momento del descarte |
+| `fecha_registro` | Momento de la imputación |
 
-Se reindexa/consulta con la vista `dq.V_RechazosPorRegla`.
+Se consulta con la vista `dq.V_ImputacionesPorRegla`.
 
 ---
 
@@ -79,7 +87,7 @@ Se reindexa/consulta con la vista `dq.V_RechazosPorRegla`.
 | 3 | Validación de fechas y estados | ✅ | `04` + `12` bloque 3 |
 | 4 | Cálculo de cohortes | ✅ | `05` (`DM_Gerencia_Membresias`) + `12` bloque 4 |
 | 5 | Carga incremental | ✅ | `04` (`dbo.etl_control`, MERGE) + `12` bloque 5 |
-| 6 | Reglas de calidad | ✅ | `04` (CAL-*, RC-*) + `12` bloque 6 (`dq.RegistroRechazos`) |
+| 6 | Reglas de calidad | ✅ | `04` (CAL-*, IMP-*) + `12` bloque 6 (`dq.RegistroImputaciones`) |
 
 ---
 
@@ -88,11 +96,12 @@ Se reindexa/consulta con la vista `dq.V_RechazosPorRegla`.
 - **Doble cobro / solapes**: no hay regla que detecte un mismo `id_membresia_bk` con montos
   o vigencias conflictivas; hoy sólo se conserva la última fila por `ROW_NUMBER` **sin registrar**.
 - **Coherencia de importes**: no se valida `monto_neto = precio_lista - descuento_aplicado`.
-- **Huérfanos tolerados**: `sk_empleado`, `sk_plan` y `id_membresia_bk` son opcionales; no se
-  rechazan (a lo sumo quedan `NULL`).
-- **Sin política de severidad/escalamiento**: no hay notificación ni cuarentena por umbral de rechazos.
+- **Huérfanos**: ya no quedan `NULL`; se imputan al centinela `-1` (cliente/empleado/plan/fecha),
+  pero no se distingue un huérfano real de un dato ausente.
+- **Sin política de severidad/escalamiento**: no hay notificación ni cuarentena por umbral de imputaciones.
 - **Auditoría de entrenamiento**: sesiones, objetivos y evaluaciones normalizan estados pero
   aún no tienen control en el bloque 2/3 de `12`.
+- **DimCliente es SCD1** (sin historial): conserva marcas de validez del origen, pero no versiona.
 
 > Las reglas de esta sección son las candidatas a implementar en la próxima iteración; hoy
 > están declaradas como brechas, no como reglas activas.

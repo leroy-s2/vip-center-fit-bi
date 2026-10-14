@@ -214,6 +214,7 @@ erDiagram
     int sk_plan PK
     string tipo_plan
     string tipo_operacion
+    string promocion
   }
   DimEmpleado {
     int sk_empleado PK
@@ -349,6 +350,8 @@ erDiagram
   DimPlan {
     int sk_plan PK
     string tipo_plan
+    string tipo_operacion
+    string promocion
   }
   DimEmpleado {
     int sk_empleado PK
@@ -395,6 +398,8 @@ erDiagram
   DimPlan {
     int sk_plan PK
     string tipo_plan
+    string tipo_operacion
+    string promocion
   }
   DimEmpleado {
     int sk_empleado PK
@@ -627,13 +632,19 @@ Viven en el esquema `dim`.
 | Dimensión | Qué representa | Atributos de análisis |
 | :--- | :--- | :--- |
 | **`DimFecha`** | Calendario y estacionalidad. | año, trimestre, semestre, mes, día, día de semana, fin de semana. |
-| **`DimCliente`** | Maestro único de socios (persona). | nombre, sexo, rango etario, estado (activo/inactivo), fechas de validez. |
+| **`DimCliente`** | Maestro único de socios (persona). **SCD Tipo 1** (sin historial; conserva marcas de validez del origen). | nombre, sexo, rango etario, estado (activo/inactivo). |
 | **`DimEmpleado`** | Personal (ventas, recepción, entrenadores). | nombre, cargo (puesto), área. |
 | **`DimPlan`** | Plan, operación y promoción. | **tipo de plan** (mensual, trimestral, semestral, anual, quinquenal, por un día), **tipo de operación** (venta, membresía, renovación, aviso, reclamo, retención, asistencia, sesión) y **promoción**. |
 
+* **`DimCliente`** es **SCD Tipo 1**: una sola fila por socio; un cambio de estado o rango etario
+  sobrescribe la fila (no versiona historial).
 * **`DimPlan`** unifica en una sola dimensión las tres propuestas originales (tipo de plan, tipo de
   operación y promoción); absorbe el antiguo catálogo de promociones, que no calificaba como
   dimensión propia.
+* **Miembros centinela (`-1`)** e **imputación**: un hecho que no resuelve su dimensión **no se
+  descarta**; se imputa al miembro centinela (`CLIENTE NO IDENTIFICADO`, `SIN EMPLEADO`, etc.) y se
+  registra la alerta en `dq.RegistroImputaciones` (ver [`docs/CALIDAD.md`](docs/CALIDAD.md)). Las FK
+  de hechos nunca quedan `NULL`.
 
 ---
 
@@ -684,9 +695,9 @@ la auditoría ejecutable, en `sql/12_reglas_calidad.sql`.
 | CAL-10/11 | Horas de ingreso y antropometría (unidades y rangos). |
 | CAL-12/13 | Catálogos de reclamos, retenciones, objetivos, sesiones y planes. |
 
-**Rechazo auditado** (la fila no entra al DW y queda registrada en `dq.RegistroRechazos`): filas que
-**no resuelven su cliente o su fecha** (reglas RC-12 a RC-23). Así ninguna pérdida de datos es
-silenciosa y puede auditarse con la vista `dq.V_RechazosPorRegla`.
+**Imputación auditada** (el hecho **siempre entra**; se imputa al centinela `-1` y queda registrado
+en `dq.RegistroImputaciones`): filas que **no resuelven su cliente o su fecha** (reglas IMP-*). Así
+no se pierde dinero y cada imputación es auditable con la vista `dq.V_ImputacionesPorRegla`.
 
 ---
 
@@ -709,7 +720,7 @@ La API (.NET 8) expone los indicadores del DW por **REST**, un **dashboard agreg
 | Actor | Endpoints |
 | :--- | :--- |
 | **Gerencia** | `/kpis/gerencia/ingresos`, `/kpis/gerencia/membresias`, `/kpis/ventas` |
-| **Comercial** | `/kpis/comercial/planes`, `/kpis/comercial/avisos-cobertura` |
+| **Comercial** | `/kpis/comercial/planes`, `/kpis/comercial/avisos-cobertura`, `/kpis/comercial/promociones/ventas`, `/kpis/comercial/promociones/membresias`, `/kpis/comercial/promociones/clientes` |
 | **Entrenamiento** | `/kpis/entrenamiento/asistencia`, `/progreso`, `/cumplimiento`, `/evaluaciones`, `/rutinas` |
 | **Recepción** | `/kpis/atencion/reclamos`, `/kpis/atencion/recepcion`, `/kpis/atencion/retencion` |
 
@@ -724,7 +735,7 @@ simulan la web del gimnasio; cada cambio lo captura CDC.
 
 ### OData (Power BI) y monitoreo
 
-* `/odata/DM_*` con `$select`, `$filter`, `$orderby`, `$top`, `$count` (un *entity set* por vista).
+* `/odata/DM_*` con `$select`, `$filter`, `$orderby`, `$top`, `$count` (un *entity set* por vista, incluyendo `DM_Promociones_Ventas`, `DM_Promociones_Membresias` y `DM_Promociones_Clientes`).
 * `GET /api/v1/etl/estado` — estado del pipeline (marca de agua CDC + ETL).
 * `GET /health` — salud del servicio.
 
@@ -779,7 +790,7 @@ docker compose up -d --build api   # API en http://localhost:5080 (Swagger en /s
 | 📘 [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md) | Blueprint de 7 etapas del pipeline y diseño en constelación. |
 | 📊 [`docs/OFICIAL1_CUMPLIMIENTO.md`](docs/OFICIAL1_CUMPLIMIENTO.md) | Trazabilidad de cada indicador contra el requerimiento corporativo. |
 | 🔌 [`docs/API.md`](docs/API.md) | Catálogo completo de endpoints REST/OData. |
-| 🧪 [`docs/CALIDAD.md`](docs/CALIDAD.md) | Catálogo de reglas de calidad (corrección y rechazo). |
+| 🧪 [`docs/CALIDAD.md`](docs/CALIDAD.md) | Catálogo de reglas de calidad (corrección e imputación). |
 | 🛠️ [`docs/OPERACION.md`](docs/OPERACION.md) | Runbook: jobs, backups y seguridad. |
 | 📐 [`docs/ERD.md`](docs/ERD.md) | Diagrama entidad-relación de toda la constelación. |
 
