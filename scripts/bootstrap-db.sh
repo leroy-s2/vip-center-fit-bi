@@ -78,7 +78,14 @@ run_sql() {
 run_sql "00_origen.sql"                  # crea/recarga el origen crudo
 run_sql "02_staging_estructura.sql"      # crea las tablas stg.*
 run_sql "03_ingesta_programada.sql"      # carga batch inicial -> staging
-run_sql "04_transformacion_datamart.sql" # DDL idempotente + ETL inicial -> data mart
+
+# El DW no se recrea solo (04 sólo crea si no existe): se elimina para aplicar
+# cambios de esquema en cada bootstrap. ORIGEN y STG ya se reconstruyen arriba.
+echo ">> Recreando BI_VIP_CENTER_FIT_DW (esquema limpio)..."
+docker exec "$CONTAINER" "$SQLCMD" -S localhost -U sa -P "$SA_PASSWORD" -C -b -Q \
+  "IF DB_ID(N'BI_VIP_CENTER_FIT_DW') IS NOT NULL BEGIN ALTER DATABASE BI_VIP_CENTER_FIT_DW SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE BI_VIP_CENTER_FIT_DW; END;"
+
+run_sql "04_transformacion_datamart.sql" # crea el DW desde cero + ETL inicial -> data mart
 run_sql "05_metricas_datamart.sql"       # crea las vistas DM_* de KPIs
 run_sql "12_reglas_calidad.sql"          # auditoría de reglas de calidad (dq.*)
 run_sql "03_cdc_ingesta.sql"             # habilita CDC + proc usp_Ingesta_CDC + marca de agua

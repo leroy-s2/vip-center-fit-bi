@@ -81,7 +81,7 @@ INNER JOIN dim.DimFecha ff ON ff.sk_fecha = fm.sk_fecha_fin
 WHERE fm.estado_membresia = 'ACTIVA' AND ff.fecha < '2026-09-29'
 UNION ALL
 SELECT 'FEC-03 Fechas fuera de rango en DimFecha', COUNT(*) FROM dim.DimFecha
-WHERE fecha < '2000-01-01' OR fecha > '2100-12-31'
+WHERE sk_fecha <> -1 AND (fecha < '2000-01-01' OR fecha > '2100-12-31')
 UNION ALL
 SELECT 'FEC-04 Hora de ingreso fuera de rango', COUNT(*) FROM dm_entrenamiento.FactAsistencias
 WHERE hora_ingreso IS NOT NULL AND (hora_ingreso < 5 OR hora_ingreso > 23);

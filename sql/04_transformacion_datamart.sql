@@ -1721,10 +1721,10 @@ DELETE FROM dm_comercial.FactAvisos;
 DELETE FROM dm_comercial.FactRenovaciones;
 DELETE FROM dm_comercial.FactMembresias;
 DELETE FROM dm_comercial.FactVentas;
-DELETE FROM dim.DimPlan;
-DELETE FROM dim.DimEmpleado;
-DELETE FROM dim.DimCliente;
-DELETE FROM dim.DimFecha;
+DELETE FROM dim.DimPlan     WHERE sk_plan     <> -1;
+DELETE FROM dim.DimEmpleado WHERE sk_empleado <> -1;
+DELETE FROM dim.DimCliente  WHERE sk_cliente  <> -1;
+DELETE FROM dim.DimFecha    WHERE sk_fecha    <> -1;
 DELETE FROM dq.RegistroImputaciones;
 UPDATE dbo.etl_control SET ultimo_staging_id = 0, ultima_carga = NULL, filas_ultima_carga = NULL;
 GO
