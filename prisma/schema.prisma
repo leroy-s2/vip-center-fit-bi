@@ -91,6 +91,7 @@ model DimPlan {
   promocion                 String                      @db.VarChar(100)
   FactAsistencias           FactAsistencias[]
   FactMembresias            FactMembresias[]
+  FactRetenciones           FactRetenciones[]
   FactSesionesEntrenamiento FactSesionesEntrenamiento[]
   FactVentas                FactVentas[]
 
@@ -278,6 +279,7 @@ model FactRetenciones {
   sk_fecha_retencion   Int
   sk_cliente           Int
   sk_empleado          Int
+  sk_plan              Int
   id_membresia_bk      Int?
   sk_fecha_vencimiento Int?
   canal                String      @db.VarChar(40)
@@ -289,6 +291,7 @@ model FactRetenciones {
   DimEmpleado          DimEmpleado @relation(fields: [sk_empleado], references: [sk_empleado], onUpdate: NoAction, map: "FK_FactRetenciones_DimEmpleado")
   DimFechaAccion       DimFecha    @relation("FactRetencionesAccion", fields: [sk_fecha_retencion], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactRetenciones_DimFecha")
   DimFechaVencimiento  DimFecha?   @relation("FactRetencionesVencimiento", fields: [sk_fecha_vencimiento], references: [sk_fecha], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactRetenciones_DimFechaVencimiento")
+  DimPlan              DimPlan     @relation(fields: [sk_plan], references: [sk_plan], onUpdate: NoAction, map: "FK_FactRetenciones_DimPlan")
 
   @@index([sk_fecha_retencion], map: "IX_FactRetenciones_Fecha")
   @@schema("dm_atencion")

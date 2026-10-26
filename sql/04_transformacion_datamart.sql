@@ -439,6 +439,7 @@ CREATE TABLE dm_atencion.FactRetenciones
     sk_fecha_retencion INT NOT NULL,
     sk_cliente INT NOT NULL,
     sk_empleado INT NOT NULL,
+    sk_plan INT NOT NULL,
     id_membresia_bk INT NULL,
     sk_fecha_vencimiento INT NULL,
     canal VARCHAR(40) NOT NULL,
@@ -453,6 +454,8 @@ IF COL_LENGTH('dm_atencion.FactRetenciones', 'sk_fecha_vencimiento') IS NULL
     ALTER TABLE dm_atencion.FactRetenciones ADD sk_fecha_vencimiento INT NULL;
 IF COL_LENGTH('dm_atencion.FactRetenciones', 'recuperada') IS NULL
     ALTER TABLE dm_atencion.FactRetenciones ADD recuperada BIT NULL;
+IF COL_LENGTH('dm_atencion.FactRetenciones', 'sk_plan') IS NULL
+    ALTER TABLE dm_atencion.FactRetenciones ADD sk_plan INT NULL;
 GO
 
 /* -----------------------------------------------------------------------------
@@ -468,8 +471,9 @@ UPDATE dm_entrenamiento.FactSesionesEntrenamiento SET sk_empleado = -1 WHERE sk_
 UPDATE dm_entrenamiento.FactSesionesEntrenamiento SET asistio = 0 WHERE asistio IS NULL;
 UPDATE dm_atencion.FactReclamos                   SET sk_empleado = -1 WHERE sk_empleado IS NULL;
 UPDATE dm_atencion.FactReclamos                   SET escalado = 0 WHERE escalado IS NULL;
-UPDATE dm_atencion.FactRetenciones                SET sk_empleado = -1 WHERE sk_empleado IS NULL;
-UPDATE dm_atencion.FactRetenciones                SET recuperada = 0 WHERE recuperada IS NULL;
+UPDATE dm_atencion.FactRetenciones              SET sk_empleado = -1 WHERE sk_empleado IS NULL;
+UPDATE dm_atencion.FactRetenciones              SET sk_plan = -1 WHERE sk_plan IS NULL;
+UPDATE dm_atencion.FactRetenciones              SET recuperada = 0 WHERE recuperada IS NULL;
 GO
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_comercial.FactVentas') AND name = 'sk_empleado' AND is_nullable = 1)
@@ -494,6 +498,8 @@ IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_atencion.Fa
     ALTER TABLE dm_atencion.FactReclamos ALTER COLUMN escalado BIT NOT NULL;
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_atencion.FactRetenciones') AND name = 'sk_empleado' AND is_nullable = 1)
     ALTER TABLE dm_atencion.FactRetenciones ALTER COLUMN sk_empleado INT NOT NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_atencion.FactRetenciones') AND name = 'sk_plan' AND is_nullable = 1)
+    ALTER TABLE dm_atencion.FactRetenciones ALTER COLUMN sk_plan INT NOT NULL;
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dm_atencion.FactRetenciones') AND name = 'recuperada' AND is_nullable = 1)
     ALTER TABLE dm_atencion.FactRetenciones ALTER COLUMN recuperada BIT NOT NULL;
 GO
@@ -704,6 +710,9 @@ IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_FactRetenciones_D
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_FactRetenciones_DimEmpleado')
     ALTER TABLE dm_atencion.FactRetenciones ADD CONSTRAINT FK_FactRetenciones_DimEmpleado
         FOREIGN KEY (sk_empleado) REFERENCES dim.DimEmpleado(sk_empleado);
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_FactRetenciones_DimPlan')
+    ALTER TABLE dm_atencion.FactRetenciones ADD CONSTRAINT FK_FactRetenciones_DimPlan
+        FOREIGN KEY (sk_plan) REFERENCES dim.DimPlan(sk_plan);
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_FactRetenciones_DimFechaVencimiento')
     ALTER TABLE dm_atencion.FactRetenciones ADD CONSTRAINT FK_FactRetenciones_DimFechaVencimiento
         FOREIGN KEY (sk_fecha_vencimiento) REFERENCES dim.DimFecha(sk_fecha);
@@ -1424,11 +1433,17 @@ BEGIN
            derivan aquí: el vencimiento viene de la membresía y la recuperación
            del resultado o de una renovación posterior a la acción. */
         IF OBJECT_ID('tempdb..#MemVencimiento') IS NOT NULL DROP TABLE #MemVencimiento;
-        SELECT m.id_membresia_bk, MIN(mf.sk_fecha) AS sk_fecha_fin
+        SELECT m.id_membresia_bk,
+               MIN(mf.sk_fecha) AS sk_fecha_fin,
+               MAX(p.sk_plan) AS sk_plan
         INTO #MemVencimiento
         FROM dbo.stg_ventas_membresias m
         LEFT JOIN #MapFecha mf0 ON mf0.sk_fecha_origen = m.sk_fecha_fin_origen
         LEFT JOIN dim.DimFecha mf ON mf.sk_fecha = mf0.sk_fecha
+        LEFT JOIN #PlanOrigen tp ON tp.sk_plan_origen = m.sk_plan_origen
+        LEFT JOIN dim.DimPlan p ON p.tipo_plan = ISNULL(tp.tipo_plan, 'NO_APLICA')
+                                AND p.tipo_operacion = 'MEMBRESIA'
+                                AND p.promocion = ISNULL(tp.promocion, 'SIN PROMOCION')
         WHERE m.EntidadOrigen = 'MEMBRESIA' AND m.id_membresia_bk IS NOT NULL
           AND m.OperacionCDC IN (2, 4)
         GROUP BY m.id_membresia_bk;
@@ -1460,6 +1475,7 @@ BEGIN
                 r.id_retencion_bk,
                 ISNULL(mf.sk_fecha, -1) AS sk_fecha_retencion,
                 ISNULL(c.sk_cliente, -1) AS sk_cliente, ISNULL(e.sk_empleado, -1) AS sk_empleado,
+                ISNULL(mv.sk_plan, -1) AS sk_plan,
                 r.id_membresia_bk,
                 mv.sk_fecha_fin AS sk_fecha_vencimiento,
                 CASE
@@ -1501,13 +1517,14 @@ BEGIN
         ON t.id_retencion_bk = s.id_retencion_bk
         WHEN MATCHED THEN UPDATE SET
             t.sk_fecha_retencion = s.sk_fecha_retencion, t.sk_cliente = s.sk_cliente, t.sk_empleado = s.sk_empleado,
+            t.sk_plan = s.sk_plan,
             t.id_membresia_bk = s.id_membresia_bk, t.sk_fecha_vencimiento = s.sk_fecha_vencimiento,
             t.canal = s.canal, t.motivo = s.motivo, t.resultado = s.resultado,
             t.recuperada = s.recuperada, t.monto_oferta = s.monto_oferta
         WHEN NOT MATCHED BY TARGET THEN
-            INSERT (id_retencion_bk, sk_fecha_retencion, sk_cliente, sk_empleado, id_membresia_bk,
+            INSERT (id_retencion_bk, sk_fecha_retencion, sk_cliente, sk_empleado, sk_plan, id_membresia_bk,
                     sk_fecha_vencimiento, canal, motivo, resultado, recuperada, monto_oferta)
-            VALUES (s.id_retencion_bk, s.sk_fecha_retencion, s.sk_cliente, s.sk_empleado, s.id_membresia_bk,
+            VALUES (s.id_retencion_bk, s.sk_fecha_retencion, s.sk_cliente, s.sk_empleado, s.sk_plan, s.id_membresia_bk,
                     s.sk_fecha_vencimiento, s.canal, s.motivo, s.resultado, s.recuperada, s.monto_oferta);
 
         /* =====================================================================

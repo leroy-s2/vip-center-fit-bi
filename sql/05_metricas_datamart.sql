@@ -374,7 +374,7 @@ SELECT
              / COUNT(DISTINCT fr.id_reclamo_bk)
     END AS TasaResolucionDirectaMostrador,
     COUNT(DISTINCT CASE WHEN fr.escalado = 1 THEN fr.id_reclamo_bk END) AS ReclamosEscalados,
-    AVG(CASE WHEN fr.estado = 'RESUELTO' THEN fr.dias_resolucion END) AS PromedioDiasResolucion
+    CAST(AVG(CASE WHEN fr.estado = 'RESUELTO' THEN fr.dias_resolucion END) AS DECIMAL(9,2)) AS PromedioDiasResolucion
 FROM dbo.FactReclamos fr
 INNER JOIN dbo.DimFecha df ON df.sk_fecha = fr.sk_fecha_reclamo
 GROUP BY df.anio, df.mes, df.nombre_mes, fr.categoria;

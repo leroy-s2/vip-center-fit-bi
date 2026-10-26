@@ -167,6 +167,7 @@ erDiagram
     int sk_fecha_retencion
     int sk_cliente
     int sk_empleado
+    int sk_plan
     int id_membresia_bk
     int sk_fecha_vencimiento
     string canal
@@ -216,6 +217,7 @@ erDiagram
   FactRetenciones }o--|| DimEmpleado : "sk_empleado"
   FactRetenciones }o--|| DimFecha : "sk_fecha_retencion"
   FactRetenciones }o--|| DimFecha : "sk_fecha_vencimiento"
+  FactRetenciones }o--|| DimPlan : "sk_plan"
 ```
 
 ## Data Mart: Atención y reclamos
@@ -245,6 +247,7 @@ erDiagram
     int sk_fecha_retencion
     int sk_cliente
     int sk_empleado
+    int sk_plan
     int id_membresia_bk
     int sk_fecha_vencimiento
     string canal
@@ -289,6 +292,12 @@ erDiagram
     string dia_semana
     boolean es_fin_de_semana
   }
+  DimPlan {
+    int sk_plan PK
+    string tipo_plan
+    string tipo_operacion
+    string promocion
+  }
   FactReclamos }o--|| DimCliente : "sk_cliente"
   FactReclamos }o--|| DimEmpleado : "sk_empleado"
   FactReclamos }o--|| DimFecha : "sk_fecha_reclamo"
@@ -298,6 +307,7 @@ erDiagram
   FactRetenciones }o--|| DimEmpleado : "sk_empleado"
   FactRetenciones }o--|| DimFecha : "sk_fecha_retencion"
   FactRetenciones }o--|| DimFecha : "sk_fecha_vencimiento"
+  FactRetenciones }o--|| DimPlan : "sk_plan"
 ```
 
 ## Data Mart: Comercial — ventas y membresías
@@ -524,7 +534,7 @@ erDiagram
 | Data mart | Hecho | Dimensiones |
 | --- | --- | --- |
 | Atención y reclamos | FactReclamos | DimCliente, DimEmpleado, DimFecha |
-| Atención y reclamos | FactRetenciones | DimCliente, DimEmpleado, DimFecha |
+| Atención y reclamos | FactRetenciones | DimCliente, DimEmpleado, DimFecha, DimPlan |
 | Comercial — ventas y membresías | FactVentas | DimCliente, DimEmpleado, DimFecha, DimPlan |
 | Comercial — ventas y membresías | FactMembresias | DimCliente, DimEmpleado, DimFecha, DimPlan |
 | Entrenamiento | FactAsistencias | DimCliente, DimEmpleado, DimFecha, DimPlan |

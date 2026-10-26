@@ -170,5 +170,5 @@ public record FactReclamosDto(
 
 public record FactRetencionesDto(
     string RowKey, long SkRetencion, int IdRetencionBk, int SkFechaRetencion, int SkCliente,
-    int SkEmpleado, int? IdMembresiaBk, int? SkFechaVencimiento, string Canal,
+    int SkEmpleado, int SkPlan, int? IdMembresiaBk, int? SkFechaVencimiento, string Canal,
     string Motivo, string Resultado, bool Recuperada, decimal? MontoOferta) : IKpiRow;
