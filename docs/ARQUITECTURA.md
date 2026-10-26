@@ -6,17 +6,20 @@ Warehouse) y las APIs listas para un frontend.
 ```
 1 Fuentes            2 Captura         3 Staging/Raw     4 Transformación   5 DataMart        6 Consumo      7 Decisión
   ORIGEN       →      CDC continuo →    stg.*        →   limpieza/reglas →  constelación    →  API + PBI  →  actores
-  (16 tablas)         (cdc.*_CT)        + marca de agua   + MERGE           3 data marts       REST/OData
+  (15 tablas)         (cdc.*_CT)        + marca de agua   + MERGE + snapshot 3 datamarts       REST/OData
 ```
 
 ## 1. Fuente (OLTP): `BI_VIP_CENTER_FIT_DW_ORIGEN`
 
-16 tablas (5 dimensiones, 11 hechos) **sin PK/FK y con defectos inyectados a propósito**.
+15 tablas (4 dimensiones + 11 tablas de eventos) **sin PK/FK y con defectos inyectados a propósito**.
 Es donde **escribe la API** (`POST /api/v1/...`), simulando la web del gimnasio (JMeter).
+
+El ORIGEN conserva el detalle operativo (aviso, renovación, objetivo, evaluación y evaluación
+programada son eventos reales del negocio); la **consolidación a 7 hechos ocurre en el ETL**.
 
 ## 2. Captura de cambios: CDC de SQL Server
 
-CDC habilitado en las 16 tablas (`cdc.*_CT`). Requiere SQL Server Agent activo.
+CDC habilitado en las 15 tablas (`cdc.*_CT`). Requiere SQL Server Agent activo.
 `sql/03_cdc_ingesta.sql` habilita CDC y crea `dbo.usp_Ingesta_CDC`.
 
 ## 3. Staging/Raw: `BI_VIP_CENTER_FIT_STG`
@@ -40,15 +43,26 @@ No son 3 datamarts aislados: es **un DW** cuyos 3 datamarts (estrellas) comparte
 
 | Data mart (esquema) | Área / actor | Hechos |
 | --- | --- | --- |
-| `dm_comercial` | Administración y Comercial | FactVentas, FactMembresias, FactRenovaciones, FactAvisos |
-| `dm_entrenamiento` | Entrenador | FactAsistencias, FactSesionesProgramadas, FactObjetivos, FactEvaluaciones, FactEvaluacionesProgramadas |
+| `dm_comercial` | Administración y Comercial | FactVentas, FactMembresias (absorbe renovaciones y avisos) |
+| `dm_entrenamiento` | Entrenador | FactAsistencias, FactSesionesEntrenamiento, FactSeguimientoFisico (absorbe objetivos y evaluaciones) |
 | `dm_atencion` | Recepción | FactReclamos, FactRetenciones |
 | `dim` (compartido) | — | DimFecha, DimCliente, DimEmpleado, DimPlan |
+
+**Consolidación (M01/M02/M03):** de las 11 tablas de hechos del modelo anterior quedan 7.
+`FactRenovaciones` y `FactAvisos` se absorben en `FactMembresias`; `FactObjetivos`,
+`FactEvaluaciones` y `FactEvaluacionesProgramadas` se consolidan en `FactSeguimientoFisico`;
+`FactSesionesProgramadas` pasa a llamarse `FactSesionesEntrenamiento`.
+
+**Snapshots diarios.** `FactMembresias` y `FactSeguimientoFisico` tienen grano
+*clave de negocio + fecha de corte*. El ETL construye la serie día por día desde el inicio de cada
+contrato/objetivo, añade los cortes faltantes en cada corrida y actualiza la fila del mismo día si se
+re-ejecuta. Nunca copia el estado actual hacia atrás: cada corte se calcula con la información
+disponible en esa fecha. Las medidas de estado se consultan en un corte; no se suman entre días.
 
 Las FK físicas hecho → dimensión están declaradas en el motor; `docs/ERD.md` es la vista UML
 de la constelación completa (`npm run uml`).
 
-Sobre el modelo, `sql/05_metricas_datamart.sql` publica **16 vistas** `dbo.DM_*` con las
+Sobre el modelo, `sql/05_metricas_datamart.sql` publica **14 vistas** `dbo.DM_*` con las
 métricas/indicadores/KPIs.
 
 ## 6. Actualización: cada 10 minutos

@@ -26,8 +26,8 @@ public sealed class OrigenRepository(DbConnectionFactory factory)
         """, r, ct);
 
     public Task<int> InsertEmpleadoAsync(EmpleadoRequest r, CancellationToken ct) => ExecAsync("""
-        INSERT INTO dbo.DimEmpleado (id_empleado_bk, dni, nombre_completo, cargo, area)
-        VALUES (@IdEmpleadoBk, @Dni, @NombreCompleto, @Cargo, @Area)
+        INSERT INTO dbo.DimEmpleado (id_empleado_bk, dni, nombre_completo, cargo, area, codigo_empleado)
+        VALUES (@IdEmpleadoBk, @Dni, @NombreCompleto, @Cargo, @Area, @CodigoEmpleado)
         """, r, ct);
 
     public Task<int> InsertMembresiaAsync(MembresiaRequest r, CancellationToken ct) => ExecAsync("""
@@ -79,10 +79,10 @@ public sealed class OrigenRepository(DbConnectionFactory factory)
 
     public Task<int> InsertObjetivoAsync(ObjetivoRequest r, CancellationToken ct) => ExecAsync("""
         INSERT INTO dbo.FactObjetivos
-            (id_objetivo_bk, sk_fecha_inicio, sk_cliente, tipo_objetivo, valor_inicial,
+            (id_objetivo_bk, sk_fecha_inicio, sk_fecha_meta, sk_cliente, tipo_objetivo, valor_inicial,
              valor_objetivo, unidad_medida, estado)
         VALUES
-            (@IdObjetivoBk, @SkFechaInicio, @SkCliente, @TipoObjetivo, @ValorInicial,
+            (@IdObjetivoBk, @SkFechaInicio, @SkFechaMeta, @SkCliente, @TipoObjetivo, @ValorInicial,
              @ValorObjetivo, @UnidadMedida, @Estado)
         """, r, ct);
 
@@ -98,19 +98,23 @@ public sealed class OrigenRepository(DbConnectionFactory factory)
     public Task<int> InsertReclamoAsync(ReclamoRequest r, CancellationToken ct) => ExecAsync("""
         INSERT INTO dbo.FactReclamos
             (id_reclamo_bk, sk_fecha_reclamo, sk_cliente, sk_empleado, categoria, estado,
-             fecha_resolucion, dias_resolucion, resuelto_en_mostrador)
+             fecha_resolucion, fecha_cierre, dias_resolucion, resuelto_en_mostrador,
+             escalado, area_responsable)
         VALUES
             (@IdReclamoBk, @SkFechaReclamo, @SkCliente, @SkEmpleado, @Categoria, @Estado,
-             @FechaResolucion, @DiasResolucion, @ResueltoEnMostrador)
+             @FechaResolucion, @FechaCierre, @DiasResolucion, @ResueltoEnMostrador,
+             @Escalado, @AreaResponsable)
         """, r, ct);
 
     public Task<int> InsertSesionProgramadaAsync(SesionProgramadaRequest r, CancellationToken ct) => ExecAsync("""
         INSERT INTO dbo.FactSesionesProgramadas
             (id_sesion_bk, sk_fecha_programada, sk_cliente, sk_plan, sk_empleado,
-             tipo_sesion, hora_programada, estado_sesion, duracion_minutos)
+             tipo_sesion, hora_programada, estado_sesion, duracion_minutos,
+             fecha_cancelacion, motivo_cancelacion)
         VALUES
             (@IdSesionBk, @SkFechaProgramada, @SkCliente, @SkPlan, @SkEmpleado,
-             @TipoSesion, @HoraProgramada, @EstadoSesion, @DuracionMinutos)
+             @TipoSesion, @HoraProgramada, @EstadoSesion, @DuracionMinutos,
+             @FechaCancelacion, @MotivoCancelacion)
         """, r, ct);
 
     public Task<int> InsertEvaluacionProgramadaAsync(EvaluacionProgramadaRequest r, CancellationToken ct) => ExecAsync("""

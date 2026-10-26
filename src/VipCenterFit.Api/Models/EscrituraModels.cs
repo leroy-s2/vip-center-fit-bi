@@ -12,7 +12,9 @@ public record ClienteRequest(
     DateTime? FechaInicioValidez, DateTime? FechaFinValidez, bool? EsActual);
 
 public record EmpleadoRequest(
-    int? IdEmpleadoBk, string? Dni, string? NombreCompleto, string? Cargo, string? Area);
+    int? IdEmpleadoBk, string? Dni, string? NombreCompleto, string? Cargo, string? Area,
+    string? CodigoEmpleado);
+
 
 public record MembresiaRequest(
     int? IdMembresiaBk, int? SkCliente, int? SkPlan, int? SkEmpleado,
@@ -38,7 +40,8 @@ public record AsistenciaRequest(
 
 public record ObjetivoRequest(
     int? IdObjetivoBk, int? SkFechaInicio, int? SkCliente, string? TipoObjetivo,
-    decimal? ValorInicial, decimal? ValorObjetivo, string? UnidadMedida, string? Estado);
+    decimal? ValorInicial, decimal? ValorObjetivo, string? UnidadMedida, string? Estado,
+    int? SkFechaMeta);
 
 public record EvaluacionRequest(
     int? IdEvaluacionBk, int? SkFechaEvaluacion, int? SkCliente, int? SkEmpleado,
@@ -47,11 +50,12 @@ public record EvaluacionRequest(
 public record ReclamoRequest(
     int? IdReclamoBk, int? SkFechaReclamo, int? SkCliente, int? SkEmpleado,
     string? Categoria, string? Estado, DateTime? FechaResolucion, int? DiasResolucion,
-    bool? ResueltoEnMostrador);
+    bool? ResueltoEnMostrador, DateTime? FechaCierre, bool? Escalado, string? AreaResponsable);
 
 public record SesionProgramadaRequest(
     int? IdSesionBk, int? SkFechaProgramada, int? SkCliente, int? SkPlan, int? SkEmpleado,
-    string? TipoSesion, int? HoraProgramada, string? EstadoSesion, int? DuracionMinutos);
+    string? TipoSesion, int? HoraProgramada, string? EstadoSesion, int? DuracionMinutos,
+    DateTime? FechaCancelacion, string? MotivoCancelacion);
 
 public record EvaluacionProgramadaRequest(
     int? IdEvaluacionProgramadaBk, int? SkFechaProgramada, int? SkCliente, int? SkEmpleado,

@@ -22,6 +22,12 @@ jobs:
       - name: Levantar SQL Server, habilitar Agent y reconstruir el pipeline
         run: bash scripts/bootstrap-db.sh
 
+      - name: Verificar el modelo de 7 hechos y las métricas
+        run: |
+          docker exec vipfit-mssql /opt/mssql-tools18/bin/sqlcmd \
+            -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -b \
+            -i /sql/06_pruebas_datamart_metricas.sql
+
       - name: Probar el ETL incremental (SQL)
         run: |
           docker exec vipfit-mssql /opt/mssql-tools18/bin/sqlcmd \

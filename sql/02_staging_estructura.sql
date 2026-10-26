@@ -98,6 +98,7 @@ CREATE TABLE stg.stg_empleados
     SeqVal VARBINARY(10) NULL,
     sk_empleado_origen INT NULL,
     id_empleado_bk INT NULL,
+    codigo_empleado VARCHAR(20) NULL,
     dni VARCHAR(20) NULL,
     nombre_completo VARCHAR(250) NULL,
     cargo VARCHAR(60) NULL,
@@ -185,6 +186,7 @@ CREATE TABLE stg.stg_entrenamiento
     id_evaluacion_bk INT NULL,
     sk_fecha_asistencia_origen INT NULL,
     sk_fecha_inicio_origen INT NULL,
+    sk_fecha_meta_origen INT NULL,
     sk_fecha_evaluacion_origen INT NULL,
     sk_cliente_origen INT NULL,
     sk_plan_origen INT NULL,
@@ -211,6 +213,8 @@ CREATE TABLE stg.stg_entrenamiento
     duracion_minutos INT NULL,
     tipo_evaluacion VARCHAR(40) NULL,
     estado_evaluacion VARCHAR(30) NULL,
+    fecha_cancelacion DATETIME2(7) NULL,
+    motivo_cancelacion VARCHAR(60) NULL,
 
     FechaIngesta DATETIME2(0) NOT NULL DEFAULT SYSUTCDATETIME()
 );
@@ -232,8 +236,11 @@ CREATE TABLE stg.stg_atencion_reclamos
     categoria VARCHAR(60) NULL,
     estado VARCHAR(30) NULL,
     fecha_resolucion DATETIME2(7) NULL,
+    fecha_cierre DATETIME2(7) NULL,
     dias_resolucion INT NULL,
     resuelto_en_mostrador BIT NULL,
+    escalado BIT NULL,
+    area_responsable VARCHAR(60) NULL,
     id_retencion_bk INT NULL,
     sk_fecha_retencion_origen INT NULL,
     id_membresia_bk INT NULL,
@@ -253,5 +260,7 @@ CREATE INDEX IX_stg_empleados_sk ON stg.stg_empleados(sk_empleado_origen);
 CREATE INDEX IX_stg_planes_sk ON stg.stg_planes(sk_plan_origen);
 CREATE INDEX IX_stg_ventas_entidad ON stg.stg_ventas_membresias(EntidadOrigen);
 CREATE INDEX IX_stg_entrenamiento_entidad ON stg.stg_entrenamiento(EntidadOrigen);
+CREATE INDEX IX_stg_entrenamiento_objetivo ON stg.stg_entrenamiento(id_objetivo_bk);
 CREATE INDEX IX_stg_reclamos_entidad ON stg.stg_atencion_reclamos(EntidadOrigen);
+CREATE INDEX IX_stg_reclamos_bk ON stg.stg_atencion_reclamos(id_reclamo_bk);
 GO

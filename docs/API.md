@@ -66,20 +66,22 @@ Filtros comunes por querystring: `desde`/`hasta` (año), `plan`, `categoria`, `s
 | --- | --- | --- |
 | `GET /api/v1/kpis/gerencia/ingresos` | `DM_Gerencia_Ingresos` | Gerencia General |
 | `GET /api/v1/kpis/gerencia/membresias` | `DM_Gerencia_Membresias` | Gerencia General |
-| `GET /api/v1/kpis/ventas` | `DM_Ventas_Gerencia` | Gerencia General |
 | `GET /api/v1/kpis/comercial/planes` | `DM_Comercial_Plan` | Administración y Comercial |
+| `GET /api/v1/kpis/comercial/promociones` | `DM_Comercial_Promociones` | Administración y Comercial |
 | `GET /api/v1/kpis/comercial/avisos-cobertura` | `DM_Avisos_Cobertura` | Administración y Comercial |
-| `GET /api/v1/kpis/comercial/promociones/ventas` | `DM_Promociones_Ventas` | Administración y Comercial |
-| `GET /api/v1/kpis/comercial/promociones/membresias` | `DM_Promociones_Membresias` | Administración y Comercial |
-| `GET /api/v1/kpis/comercial/promociones/clientes` | `DM_Promociones_Clientes` | Administración y Comercial |
 | `GET /api/v1/kpis/atencion/reclamos` | `DM_Atencion_Reclamos` | Recepción |
 | `GET /api/v1/kpis/atencion/recepcion` | `DM_Atencion_Recepcion` | Recepción |
 | `GET /api/v1/kpis/atencion/retencion` | `DM_Atencion_Retencion` | Recepción |
 | `GET /api/v1/kpis/entrenamiento/asistencia` | `DM_Entrenamiento_Asistencia` | Entrenador |
+| `GET /api/v1/kpis/entrenamiento/accesos` | `DM_Entrenamiento_Accesos` | Entrenador |
 | `GET /api/v1/kpis/entrenamiento/progreso` | `DM_Entrenamiento_Progreso` | Entrenador |
-| `GET /api/v1/kpis/entrenamiento/cumplimiento` | `DM_Entrenamiento_Cumplimiento` | Entrenador |
+| `GET /api/v1/kpis/entrenamiento/bajo-progreso` | `DM_Entrenamiento_BajoProgreso` | Entrenador |
 | `GET /api/v1/kpis/entrenamiento/evaluaciones` | `DM_Entrenamiento_Evaluaciones` | Entrenador |
 | `GET /api/v1/kpis/entrenamiento/rutinas` | `DM_Rutinas_Entrenador` | Entrenador |
+
+> Las vistas de cohorte y de progreso (`DM_Gerencia_Membresias`, `DM_Entrenamiento_Progreso`,
+> `DM_Entrenamiento_Evaluaciones`) son **medidas de estado**: se leen en un corte y no deben sumarse
+> entre días. El campo `SkFechaCorteCierre` / `FechaCorte` identifica el corte de cada fila.
 
 **Dashboard por actor** (todo en una llamada, ideal para el frontend):
 
@@ -95,22 +97,33 @@ GET /api/v1/etl/estado
 
 ## OData (Power BI)
 
-Un entity set por vista de KPI, con `$select`, `$filter`, `$orderby`, `$top`, `$skip`, `$count`, `$expand`.
+Dos familias de *entity sets*, con `$select`, `$filter`, `$orderby`, `$top`, `$skip`, `$count`.
+
+**1) Vistas de KPI agregadas** (14): `DM_Gerencia_Ingresos`, `DM_Gerencia_Membresias`,
+`DM_Comercial_Plan`, `DM_Comercial_Promociones`, `DM_Avisos_Cobertura`, `DM_Atencion_Reclamos`,
+`DM_Atencion_Recepcion`, `DM_Atencion_Retencion`, `DM_Entrenamiento_Asistencia`,
+`DM_Entrenamiento_Accesos`, `DM_Entrenamiento_Progreso`, `DM_Entrenamiento_BajoProgreso`,
+`DM_Entrenamiento_Evaluaciones`, `DM_Rutinas_Entrenador`.
+
+**2) Modelo en estrella** (11): `DimFecha`, `DimCliente`, `DimEmpleado`, `DimPlan`, `FactVentas`,
+`FactMembresias`, `FactAsistencias`, `FactSesionesEntrenamiento`, `FactSeguimientoFisico`,
+`FactReclamos`, `FactRetenciones`.
 
 ```
 GET /odata/DM_Gerencia_Ingresos?$top=5&$count=true&$select=Anio,MesNumero,IngresosPeriodoActual
-GET /odata/DM_Comercial_Plan?$filter=Anio eq 2025 and TipoPlan eq 'MENSUAL VIP'
+GET /odata/DM_Comercial_Plan?$filter=Anio eq 2025 and TipoPlan eq 'MENSUAL'
+GET /odata/DimEmpleado?$top=100&$select=CodigoEmpleado,NombreCompleto,Area,Cargo
+GET /odata/FactVentas?fechaDesde=2026-01-01&fechaHasta=2026-09-29&$top=1000&$count=true
 GET /odata/$metadata
 ```
 
-Entity sets: `DM_Gerencia_Ingresos`, `DM_Gerencia_Membresias`, `DM_Comercial_Plan`,
-`DM_Avisos_Cobertura`, `DM_Promociones_Ventas`, `DM_Promociones_Membresias`,
-`DM_Promociones_Clientes`, `DM_Atencion_Reclamos`, `DM_Atencion_Recepcion`, `DM_Atencion_Retencion`,
-`DM_Entrenamiento_Asistencia`, `DM_Entrenamiento_Progreso`, `DM_Entrenamiento_Cumplimiento`,
-`DM_Entrenamiento_Evaluaciones`, `DM_Ventas_Gerencia`, `DM_Rutinas_Entrenador`.
+> Los **hechos exigen la ventana** `fechaDesde`/`fechaHasta` (se aplica en SQL, no en memoria). Si se
+> omite, el repositorio devuelve el último año. Para volúmenes grandes, la alternativa es importar
+> directo desde SQL con el login `pbi_lector` (4 dimensiones + 7 hechos).
 
-> Cada entidad expone una clave sintética `RowKey` (no nula) para que OData siempre
-> tenga una clave válida, ya que varias vistas no tienen clave natural.
+> Cada entidad expone una clave sintética `RowKey` (no nula), ya que varias vistas y todos los hechos
+> tienen clave compuesta. Las claves reales (`SkCliente`, `SkEmpleado`, etc.) viajan como columnas
+> para que Power BI construya las relaciones.
 
 ## Flujo de datos
 

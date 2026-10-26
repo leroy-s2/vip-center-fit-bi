@@ -18,10 +18,7 @@
 
 - [1. Matriz Bus del Data Warehouse](#1-matriz-bus-del-data-warehouse)
 - [2. El negocio: actores y decisiones](#2-el-negocio-actores-y-decisiones)
-- [3. Data Marts por proceso de negocio](#3-data-marts-por-proceso-de-negocio)
-  - [3.1 Comercial — ventas, membresías y renovaciones](#31-data-mart-comercial--ventas-membresías-y-renovaciones)
-  - [3.2 Entrenamiento — asistencia, adherencia y progreso](#32-data-mart-entrenamiento--asistencia-adherencia-y-progreso)
-  - [3.3 Atención — experiencia, reclamos y retención](#33-data-mart-atención--experiencia-reclamos-y-retención)
+- [3. Data Marts y los 7 hechos](#3-data-marts-y-los-7-hechos)
 - [4. Dimensiones conformadas](#4-dimensiones-conformadas)
 - [5. Indicadores: qué se mide](#5-indicadores-qué-se-mide)
 - [6. Reglas de calidad de datos](#6-reglas-de-calidad-de-datos)
@@ -40,22 +37,28 @@ es la suma de **Data Marts temáticos por proceso de negocio** que comparten un 
 hablen el mismo idioma y sean comparables entre sí.
 
 **Dimensiones conformadas (esquema `dim`):** `DimFecha`, `DimCliente`, `DimEmpleado`, `DimPlan`.
+**Data marts (3):** `dm_comercial`, `dm_entrenamiento`, `dm_atencion`.
+**Hechos (7):** dos comerciales, tres de entrenamiento y dos de atención.
 
-| Data Mart | Proceso de negocio (tabla de hechos) | `DimFecha` | `DimCliente` | `DimEmpleado` | `DimPlan` |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| **Comercial** | Venta / cobro — `FactVentas` | ✅ | ✅ | ✅ | ✅ |
-| **Comercial** | Contrato de membresía — `FactMembresias` | ✅ | ✅ | ✅ | ✅ |
-| **Comercial** | Renovación — `FactRenovaciones` | ✅ | ✅ | ✅ | — |
-| **Comercial** | Aviso de vencimiento — `FactAvisos` | ✅ | ✅ | ✅ | — |
-| **Entrenamiento** | Asistencia / acceso — `FactAsistencias` | ✅ | ✅ | ✅ | ✅ |
-| **Entrenamiento** | Sesión programada — `FactSesionesProgramadas` | ✅ | ✅ | ✅ | ✅ |
-| **Entrenamiento** | Objetivo deportivo — `FactObjetivos` | ✅ | ✅ | — | — |
-| **Entrenamiento** | Evaluación física — `FactEvaluaciones` | ✅ | ✅ | ✅ | — |
-| **Entrenamiento** | Evaluación programada — `FactEvaluacionesProgramadas` | ✅ | ✅ | ✅ | — |
-| **Atención** | Reclamo — `FactReclamos` | ✅ | ✅ | ✅ | — |
-| **Atención** | Retención — `FactRetenciones` | ✅ | ✅ | ✅ | — |
+| Data Mart | Hecho | Grano declarado | Fecha | Cliente | Empleado | Plan |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: |
+| **Comercial** | `FactVentas` | Un pago confirmado (`id_pago_bk`) | ✅ | ✅ | ✅ | ✅ |
+| **Comercial** | `FactMembresias` | Una membresía en una fecha de corte (`id_membresia_bk` + `sk_fecha_corte`) | ✅ | ✅ | ✅ | ✅ |
+| **Entrenamiento** | `FactAsistencias` | Una marcación real de acceso (`id_asistencia_bk`) | ✅ | ✅ | ✅ | ✅ |
+| **Entrenamiento** | `FactSesionesEntrenamiento` | Una sesión programada (`id_sesion_bk`) | ✅ | ✅ | ✅ | ✅ |
+| **Entrenamiento** | `FactSeguimientoFisico` | Un cliente, un objetivo y una fecha de corte (`sk_cliente` + `id_objetivo_bk` + `sk_fecha_corte`) | ✅ | ✅ | ✅ | — |
+| **Atención** | `FactReclamos` | Un reclamo registrado (`id_reclamo_bk`) | ✅ | ✅ | ✅ | — |
+| **Atención** | `FactRetenciones` | Una acción de retención (`id_retencion_bk`) | ✅ | ✅ | ✅ | ✅ |
 
 *Leyenda: ✅ el proceso usa la dimensión · — no aplica.*
+
+> **Consolidación (bloques M01/M02/M03 del requerimiento):**
+> - **M01 Comercial:** `FactRenovaciones` y `FactAvisos` se **absorben** en `FactMembresias`.
+>   Conservar `FactVentas` aparte mantiene la fecha, el importe y la atribución real del cobro.
+> - **M02 Entrenamiento:** `FactObjetivos`, `FactEvaluaciones` y `FactEvaluacionesProgramadas`
+>   se consolidan en `FactSeguimientoFisico`, sin perder el detalle de cada objetivo.
+> - **M03 Atención:** reclamo y acción de retención siguen separados; unirlos por cliente
+>   multiplicaría casos y resultados.
 
 ```mermaid
 flowchart LR
@@ -63,23 +66,19 @@ flowchart LR
     direction TB
     DF["DimFecha<br>(tiempo)"]
     DC["DimCliente<br>(socios)"]
-    DE["DimEmpleado<br>(staff)"]
+    DE["DimEmpleado<br>(codigo · area · cargo)"]
     DP["DimPlan<br>(plan · operación · promoción)"]
   end
 
   subgraph DMC["dm_comercial"]
     FV["FactVentas"]
-    FM["FactMembresias"]
-    FR["FactRenovaciones"]
-    FA["FactAvisos"]
+    FM["FactMembresias<br>(+ renovaciones + avisos)"]
   end
 
   subgraph DME["dm_entrenamiento"]
     FAS["FactAsistencias"]
-    FSP["FactSesionesProgramadas"]
-    FO["FactObjetivos"]
-    FE["FactEvaluaciones"]
-    FEP["FactEvaluacionesProgramadas"]
+    FSE["FactSesionesEntrenamiento"]
+    FSF["FactSeguimientoFisico<br>(+ objetivos + evaluaciones)"]
   end
 
   subgraph DMA["dm_atencion"]
@@ -113,514 +112,58 @@ problemáticas reales del sector: **abandono temprano (churn)**, **pérdida de r
 
 ---
 
-## 3. Data Marts por proceso de negocio
+## 3. Data Marts y los 7 hechos
 
 Cada Data Mart es un **esquema estrella** con claves foráneas físicas hacia las dimensiones
-conformadas. Por cada **tabla de hechos** se documenta su proceso, grano, dimensiones, indicadores
-y su **diagrama estrella**.
+conformadas. El diagrama completo está en [`docs/ERD.md`](docs/ERD.md) (generado con Prisma).
 
-### 3.1 Data Mart Comercial — ventas, membresías y renovaciones
+### 3.1 `dm_comercial` — ingresos, membresías y avisos
 
-* **Esquema:** `dm_comercial` · **Actor principal:** Administración y Jefatura Comercial.
-* **Objetivo:** monitorear el flujo de ingresos, anticipar vencimientos y medir la conversión de
-  promociones para maximizar el valor de vida del cliente (*Lifetime Value*).
+* **Actor principal:** Administración y Jefatura Comercial.
+* `FactVentas` (grano `id_pago_bk`): importes aditivos `monto_neto`, `descuento_aplicado`,
+  `precio_lista` y `metodo_pago`.
+* `FactMembresias` (grano `id_membresia_bk` + `sk_fecha_corte`):
+  - snapshot **diario** del contrato: `estado_membresia` (ACTIVA / VENCIDA / PENDIENTE) calculado
+    **en cada corte**, no copiado desde el estado actual;
+  - enlace de cohorte `id_membresia_anterior_bk` / `id_membresia_nueva_bk` y `monto_renovacion`
+    (absorbe las renovaciones);
+  - aviso del corte: `aviso_emitido`, `sk_fecha_aviso`, `medio_aviso`, `avisos_emitidos_dia`
+    (absorbe los avisos);
+  - `dias_desde_vencimiento` para la ventana de observación (90 días después del vencimiento).
 
-#### Proceso: Venta / cobro en caja
+### 3.2 `dm_entrenamiento` — accesos, sesiones y progreso
 
-* **Proceso de negocio:** cobro de planes y servicios en caja o pasarela virtual.
-* **Grano:** un registro por **pago confirmado** (`id_pago_bk`).
-* **Dimensiones:** Fecha (fecha de pago), Cliente, Empleado, Plan.
-* **Indicadores:** ingresos, ticket promedio, descuento otorgado, mix por medio de pago.
-* **Diagrama:**
+* **Actor principal:** Coordinación de Entrenamiento.
+* `FactAsistencias` (grano `id_asistencia_bk`): marcación real de torniquete, con
+  `es_acceso_valido`. **No equivale** a una sesión programada.
+* `FactSesionesEntrenamiento` (grano `id_sesion_bk`): programación, cancelación
+  (`sk_fecha_cancelacion`, `motivo_cancelacion`) y resultado (`asistio`, `estado_sesion`).
+* `FactSeguimientoFisico` (grano `sk_cliente` + `id_objetivo_bk` + `sk_fecha_corte`):
+  - `valor_actual` = **última evaluación disponible hasta ese corte** (nunca una posterior);
+  - `valor_esperado` = interpolación lineal `valor_inicial → valor_objetivo` en
+    `[sk_fecha_inicio, sk_fecha_meta]`;
+  - `avance_alcanzado`, `avance_esperado`, `porcentaje_progreso`;
+  - `evaluacion_exigible`, `evaluacion_completada`, `evaluacion_pendiente`.
 
-```mermaid
-erDiagram
-  FactVentas {
-    bigint sk_venta PK
-    int id_pago_bk UK
-    int sk_fecha_pago FK
-    int sk_cliente FK
-    int sk_plan FK
-    int sk_empleado FK
-    decimal monto_neto
-    decimal descuento_aplicado
-    decimal precio_lista
-    string metodo_pago
-  }
-  DimFecha {
-    int sk_fecha PK
-    date fecha
-    int anio
-    int mes
-  }
-  DimCliente {
-    int sk_cliente PK
-    string nombre_completo
-    string sexo
-    string rango_etario
-  }
-  DimPlan {
-    int sk_plan PK
-    string tipo_plan
-    string tipo_operacion
-    string promocion
-  }
-  DimEmpleado {
-    int sk_empleado PK
-    string nombre_completo
-    string cargo
-  }
-  FactVentas }o--|| DimFecha : "sk_fecha_pago"
-  FactVentas }o--|| DimCliente : "sk_cliente"
-  FactVentas }o--|| DimPlan : "sk_plan"
-  FactVentas }o--|| DimEmpleado : "sk_empleado"
-```
+### 3.3 `dm_atencion` — reclamos y retención
 
-#### Proceso: Contrato de membresía
+* **Actor principal:** Recepción.
+* `FactReclamos` (grano `id_reclamo_bk`): hitos de apertura, resolución y cierre
+  (`sk_fecha_reclamo`, `sk_fecha_resolucion`, `sk_fecha_cierre`), `escalado`, `area_responsable`,
+  `dias_resolucion`, `resuelto_en_mostrador`.
+* `FactRetenciones` (grano `id_retencion_bk`): acción de mostrador con `canal`, `motivo`,
+  `resultado`, `sk_fecha_vencimiento` y `recuperada` (resultado RETENIDO o renovación posterior).
 
-* **Proceso de negocio:** alta y vigencia de un contrato de afiliación.
-* **Grano:** un registro por **contrato de membresía** (`id_membresia_bk`).
-* **Dimensiones:** Fecha (inicio y fin), Cliente, Empleado, Plan.
-* **Indicadores:** membresías activas, vencimientos del período, penetración por tipo de plan.
-* **Diagrama:**
+### 3.4 Los dos snapshots diarios
 
-```mermaid
-erDiagram
-  FactMembresias {
-    bigint sk_membresia PK
-    int id_membresia_bk UK
-    int sk_cliente FK
-    int sk_plan FK
-    int sk_empleado FK
-    int sk_fecha_inicio FK
-    int sk_fecha_fin FK
-    int duracion_dias
-    decimal precio_final
-    boolean es_renovacion
-    string estado_membresia
-  }
-  DimFecha {
-    int sk_fecha PK
-    date fecha
-    int anio
-    int mes
-  }
-  DimCliente {
-    int sk_cliente PK
-    string nombre_completo
-    string rango_etario
-  }
-  DimPlan {
-    int sk_plan PK
-    string tipo_plan
-    string tipo_operacion
-    string promocion
-  }
-  DimEmpleado {
-    int sk_empleado PK
-    string nombre_completo
-  }
-  FactMembresias }o--|| DimFecha : "sk_fecha_inicio"
-  FactMembresias }o--|| DimFecha : "sk_fecha_fin"
-  FactMembresias }o--|| DimCliente : "sk_cliente"
-  FactMembresias }o--|| DimPlan : "sk_plan"
-  FactMembresias }o--|| DimEmpleado : "sk_empleado"
-```
+`FactMembresias` y `FactSeguimientoFisico` comparten la misma mecánica:
 
-#### Proceso: Renovación de membresía
-
-* **Proceso de negocio:** recontratación de un socio que vencía.
-* **Grano:** un registro por **evento de renovación** (`id_renovacion_bk`).
-* **Dimensiones:** Fecha (de renovación), Cliente, Empleado.
-* **Indicadores:** tasa de renovación, días de anticipación promedio, monto renovado.
-* **Diagrama:**
-
-```mermaid
-erDiagram
-  FactRenovaciones {
-    bigint sk_renovacion PK
-    int id_renovacion_bk UK
-    int sk_fecha_renovacion FK
-    int sk_cliente FK
-    int sk_empleado FK
-    int id_membresia_anterior_bk
-    int id_membresia_nueva_bk
-    int dias_anticipacion
-    decimal monto
-  }
-  DimFecha {
-    int sk_fecha PK
-    date fecha
-    int anio
-    int mes
-  }
-  DimCliente {
-    int sk_cliente PK
-    string nombre_completo
-    string rango_etario
-  }
-  DimEmpleado {
-    int sk_empleado PK
-    string nombre_completo
-  }
-  FactRenovaciones }o--|| DimFecha : "sk_fecha_renovacion"
-  FactRenovaciones }o--|| DimCliente : "sk_cliente"
-  FactRenovaciones }o--|| DimEmpleado : "sk_empleado"
-```
-
-#### Proceso: Aviso preventivo de vencimiento
-
-* **Proceso de negocio:** notificación al socio antes de que venza su membresía.
-* **Grano:** un registro por **aviso emitido** (`id_aviso_bk`).
-* **Dimensiones:** Fecha (del aviso), Cliente, Empleado.
-* **Indicadores:** cobertura de avisos, efectividad por canal (WhatsApp/SMS/Correo).
-* **Diagrama:**
-
-```mermaid
-erDiagram
-  FactAvisos {
-    bigint sk_aviso PK
-    int id_aviso_bk UK
-    int sk_fecha_aviso FK
-    int sk_cliente FK
-    int sk_empleado FK
-    int id_membresia_bk
-    int dias_antes_vencimiento
-    string medio
-    string estado
-  }
-  DimFecha {
-    int sk_fecha PK
-    date fecha
-    int anio
-    int mes
-  }
-  DimCliente {
-    int sk_cliente PK
-    string nombre_completo
-  }
-  DimEmpleado {
-    int sk_empleado PK
-    string nombre_completo
-  }
-  FactAvisos }o--|| DimFecha : "sk_fecha_aviso"
-  FactAvisos }o--|| DimCliente : "sk_cliente"
-  FactAvisos }o--|| DimEmpleado : "sk_empleado"
-```
-
----
-
-### 3.2 Data Mart Entrenamiento — asistencia, adherencia y progreso
-
-* **Esquema:** `dm_entrenamiento` · **Actor principal:** Coordinación de Entrenamiento.
-* **Objetivo:** detectar socios en riesgo de abandono y asegurar el cumplimiento del protocolo
-  de evaluaciones físicas.
-
-#### Proceso: Asistencia / control de acceso
-
-* **Proceso de negocio:** ingresos reales al club (torniquete).
-* **Grano:** un registro por **marcación de acceso** (`id_asistencia_bk`).
-* **Dimensiones:** Fecha, Cliente, Plan, Empleado.
-* **Indicadores:** aforo por hora, frecuencia semanal promedio, adherencia por cliente.
-* **Diagrama:**
-
-```mermaid
-erDiagram
-  FactAsistencias {
-    bigint sk_asistencia PK
-    int id_asistencia_bk UK
-    int sk_fecha_asistencia FK
-    int sk_cliente FK
-    int sk_plan FK
-    int sk_empleado FK
-    int hora_ingreso
-    int cantidad_asistencias
-  }
-  DimFecha {
-    int sk_fecha PK
-    date fecha
-    int anio
-    int mes
-  }
-  DimCliente {
-    int sk_cliente PK
-    string nombre_completo
-    string rango_etario
-  }
-  DimPlan {
-    int sk_plan PK
-    string tipo_plan
-    string tipo_operacion
-    string promocion
-  }
-  DimEmpleado {
-    int sk_empleado PK
-    string nombre_completo
-  }
-  FactAsistencias }o--|| DimFecha : "sk_fecha_asistencia"
-  FactAsistencias }o--|| DimCliente : "sk_cliente"
-  FactAsistencias }o--|| DimPlan : "sk_plan"
-  FactAsistencias }o--|| DimEmpleado : "sk_empleado"
-```
-
-#### Proceso: Sesión programada (clases y entrenamiento personal)
-
-* **Proceso de negocio:** reserva de clases grupales o sesiones con entrenador.
-* **Grano:** un registro por **sesión programada** (`id_sesion_bk`).
-* **Dimensiones:** Fecha, Cliente, Plan, Empleado.
-* **Indicadores:** tasa de asistencia a clases, ausentismo (*no-show*), demanda por entrenador.
-* **Diagrama:**
-
-```mermaid
-erDiagram
-  FactSesionesProgramadas {
-    bigint sk_sesion_programada PK
-    int id_sesion_bk UK
-    int sk_fecha_programada FK
-    int sk_cliente FK
-    int sk_plan FK
-    int sk_empleado FK
-    string tipo_sesion
-    int hora_programada
-    string estado_sesion
-    int duracion_minutos
-  }
-  DimFecha {
-    int sk_fecha PK
-    date fecha
-    int anio
-    int mes
-  }
-  DimCliente {
-    int sk_cliente PK
-    string nombre_completo
-  }
-  DimPlan {
-    int sk_plan PK
-    string tipo_plan
-    string tipo_operacion
-    string promocion
-  }
-  DimEmpleado {
-    int sk_empleado PK
-    string nombre_completo
-  }
-  FactSesionesProgramadas }o--|| DimFecha : "sk_fecha_programada"
-  FactSesionesProgramadas }o--|| DimCliente : "sk_cliente"
-  FactSesionesProgramadas }o--|| DimPlan : "sk_plan"
-  FactSesionesProgramadas }o--|| DimEmpleado : "sk_empleado"
-```
-
-#### Proceso: Objetivo deportivo
-
-* **Proceso de negocio:** meta física fijada con el socio (bajar grasa, ganar masa, etc.).
-* **Grano:** un registro por **objetivo formalizado** (`id_objetivo_bk`).
-* **Dimensiones:** Fecha (inicio), Cliente.
-* **Indicadores:** avance vs. meta, detección de bajo progreso / estancamiento.
-* **Diagrama:**
-
-```mermaid
-erDiagram
-  FactObjetivos {
-    bigint sk_objetivo PK
-    int id_objetivo_bk UK
-    int sk_fecha_inicio FK
-    int sk_cliente FK
-    string tipo_objetivo
-    decimal valor_inicial
-    decimal valor_objetivo
-    string unidad_medida
-    string estado
-  }
-  DimFecha {
-    int sk_fecha PK
-    date fecha
-    int anio
-    int mes
-  }
-  DimCliente {
-    int sk_cliente PK
-    string nombre_completo
-    string rango_etario
-  }
-  FactObjetivos }o--|| DimFecha : "sk_fecha_inicio"
-  FactObjetivos }o--|| DimCliente : "sk_cliente"
-```
-
-#### Proceso: Evaluación física (antropometría)
-
-* **Proceso de negocio:** medición biométrica del socio (peso, grasa, masa muscular).
-* **Grano:** un registro por **evaluación realizada** (`id_evaluacion_bk`).
-* **Dimensiones:** Fecha, Cliente, Empleado.
-* **Indicadores:** variación de composición corporal, efectividad por entrenador.
-* **Diagrama:**
-
-```mermaid
-erDiagram
-  FactEvaluaciones {
-    bigint sk_evaluacion PK
-    int id_evaluacion_bk UK
-    int sk_fecha_evaluacion FK
-    int sk_cliente FK
-    int sk_empleado FK
-    int id_objetivo_bk
-    decimal peso
-    decimal altura
-    decimal grasa_corporal
-    decimal masa_muscular
-  }
-  DimFecha {
-    int sk_fecha PK
-    date fecha
-    int anio
-    int mes
-  }
-  DimCliente {
-    int sk_cliente PK
-    string nombre_completo
-  }
-  DimEmpleado {
-    int sk_empleado PK
-    string nombre_completo
-  }
-  FactEvaluaciones }o--|| DimFecha : "sk_fecha_evaluacion"
-  FactEvaluaciones }o--|| DimCliente : "sk_cliente"
-  FactEvaluaciones }o--|| DimEmpleado : "sk_empleado"
-```
-
-#### Proceso: Evaluación programada (protocolo de seguimiento)
-
-* **Proceso de negocio:** cita de evaluación pactada con el socio (exigible vs. realizada).
-* **Grano:** un registro por **evaluación programada** (`id_evaluacion_programada_bk`).
-* **Dimensiones:** Fecha, Cliente, Empleado.
-* **Indicadores:** evaluaciones exigibles, completadas y pendientes; cumplimiento del protocolo.
-* **Diagrama:**
-
-```mermaid
-erDiagram
-  FactEvaluacionesProgramadas {
-    bigint sk_evaluacion_programada PK
-    int id_evaluacion_programada_bk UK
-    int sk_fecha_programada FK
-    int sk_cliente FK
-    int sk_empleado FK
-    int id_objetivo_bk
-    string tipo_evaluacion
-    string estado_evaluacion
-    int id_evaluacion_bk
-  }
-  DimFecha {
-    int sk_fecha PK
-    date fecha
-    int anio
-    int mes
-  }
-  DimCliente {
-    int sk_cliente PK
-    string nombre_completo
-  }
-  DimEmpleado {
-    int sk_empleado PK
-    string nombre_completo
-  }
-  FactEvaluacionesProgramadas }o--|| DimFecha : "sk_fecha_programada"
-  FactEvaluacionesProgramadas }o--|| DimCliente : "sk_cliente"
-  FactEvaluacionesProgramadas }o--|| DimEmpleado : "sk_empleado"
-```
-
----
-
-### 3.3 Data Mart Atención — experiencia, reclamos y retención
-
-* **Esquema:** `dm_atencion` · **Actor principal:** Recepción.
-* **Objetivo:** medir la fricción en la experiencia del socio y la efectividad del mostrador para
-  resolver quejas y rescatar cancelaciones inminentes.
-
-#### Proceso: Reclamo en mostrador
-
-* **Proceso de negocio:** incidencia sobre infraestructura, máquinas, limpieza o atención.
-* **Grano:** un registro por **reclamo ingresado** (`id_reclamo_bk`).
-* **Dimensiones:** Fecha (del reclamo), Cliente, Empleado.
-* **Indicadores:** tasa de resolución, resolución directa en mostrador, días promedio de resolución.
-* **Diagrama:**
-
-```mermaid
-erDiagram
-  FactReclamos {
-    bigint sk_reclamo PK
-    int id_reclamo_bk UK
-    int sk_fecha_reclamo FK
-    int sk_cliente FK
-    int sk_empleado FK
-    string categoria
-    string estado
-    datetime fecha_resolucion
-    int dias_resolucion
-    boolean resuelto_en_mostrador
-  }
-  DimFecha {
-    int sk_fecha PK
-    date fecha
-    int anio
-    int mes
-  }
-  DimCliente {
-    int sk_cliente PK
-    string nombre_completo
-    string rango_etario
-  }
-  DimEmpleado {
-    int sk_empleado PK
-    string nombre_completo
-    string area
-  }
-  FactReclamos }o--|| DimFecha : "sk_fecha_reclamo"
-  FactReclamos }o--|| DimCliente : "sk_cliente"
-  FactReclamos }o--|| DimEmpleado : "sk_empleado"
-```
-
-#### Proceso: Acción de retención / rescate
-
-* **Proceso de negocio:** intervención para evitar la baja de un socio insatisfecho.
-* **Grano:** un registro por **acción de retención ejecutada** (`id_retencion_bk`).
-* **Dimensiones:** Fecha (de la acción), Cliente, Empleado.
-* **Indicadores:** tasa de éxito de retención, motivos de baja, impacto del monto de contraoferta.
-* **Diagrama:**
-
-```mermaid
-erDiagram
-  FactRetenciones {
-    bigint sk_retencion PK
-    int id_retencion_bk UK
-    int sk_fecha_retencion FK
-    int sk_cliente FK
-    int sk_empleado FK
-    int id_membresia_bk
-    string canal
-    string motivo
-    string resultado
-    decimal monto_oferta
-  }
-  DimFecha {
-    int sk_fecha PK
-    date fecha
-    int anio
-    int mes
-  }
-  DimCliente {
-    int sk_cliente PK
-    string nombre_completo
-    string rango_etario
-    string estado_cliente
-  }
-  DimEmpleado {
-    int sk_empleado PK
-    string nombre_completo
-  }
-  FactRetenciones }o--|| DimFecha : "sk_fecha_retencion"
-  FactRetenciones }o--|| DimCliente : "sk_cliente"
-  FactRetenciones }o--|| DimEmpleado : "sk_empleado"
-```
+1. La serie arranca en el **inicio** del contrato/objetivo, no en el día de la carga.
+2. El ETL **añade los días faltantes** y actualiza la fila del mismo día si se re-ejecuta.
+3. Una **corrección histórica** recalcula los cortes afectados.
+4. Las medidas de estado (membresías activas, progreso, evaluaciones pendientes) **se leen en un
+   corte**; nunca se suman entre días. Las cantidades de evento (avisos, ventas, reclamos) sí son
+   aditivas.
 
 ---
 
@@ -633,11 +176,14 @@ Viven en el esquema `dim`.
 | :--- | :--- | :--- |
 | **`DimFecha`** | Calendario y estacionalidad. | año, trimestre, semestre, mes, día, día de semana, fin de semana. |
 | **`DimCliente`** | Maestro único de socios (persona). **SCD Tipo 1** (sin historial; conserva marcas de validez del origen). | nombre, sexo, rango etario, estado (activo/inactivo). |
-| **`DimEmpleado`** | Personal (ventas, recepción, entrenadores). | nombre, cargo (puesto), área. |
-| **`DimPlan`** | Plan, operación y promoción. | **tipo de plan** (mensual, trimestral, semestral, anual, quinquenal, por un día), **tipo de operación** (venta, membresía, renovación, aviso, reclamo, retención, asistencia, sesión) y **promoción**. |
+| **`DimEmpleado`** | Personal, **reestructurada** en el requerimiento v2. | **código de empleado** (clave de negocio visible), **área**, **cargo (puesto)** y nombre. |
+| **`DimPlan`** | Plan, operación y promoción. | **tipo de plan** (mensual, trimestral, semestral, anual, quinquenal, por un día), **tipo de operación** (venta, membresía, asistencia, sesión) y **promoción**. |
 
 * **`DimCliente`** es **SCD Tipo 1**: una sola fila por socio; un cambio de estado o rango etario
   sobrescribe la fila (no versiona historial).
+* **`DimEmpleado`** cambia de forma respecto al modelo anterior: `codigo_empleado` pasa a ser una
+  clave de negocio única y los atributos de bus son `area`, `cargo` y el propio código. El nombre se
+  conserva porque el modelo semántico de Power BI sigue filtrando por *Empleado: nombre/puesto/área*.
 * **`DimPlan`** unifica en una sola dimensión las tres propuestas originales (tipo de plan, tipo de
   operación y promoción); absorbe el antiguo catálogo de promociones, que no calificaba como
   dimensión propia.
@@ -650,30 +196,28 @@ Viven en el esquema `dim`.
 
 ## 5. Indicadores: qué se mide
 
-El DW publica **16 vistas** `dbo.DM_*` que desacoplan las fórmulas del consumidor final (Power BI
+El DW publica **14 vistas** `dbo.DM_*` que desacoplan las fórmulas del consumidor final (Power BI
 o API). Cada vista corresponde a las preguntas de negocio de un área.
 
 | Área | Vista | Qué responde |
 | :--- | :--- | :--- |
 | **Gerencia** | `DM_Gerencia_Ingresos` | Ingresos del período actual vs. anterior y tasa de crecimiento. |
-| **Gerencia** | `DM_Gerencia_Membresias` | Clientes activos, retención y renovación de cohortes. |
-| **Gerencia** | `DM_Ventas_Gerencia` | Ingresos y ventas por trimestre y tipo de plan. |
-| **Comercial** | `DM_Comercial_Plan` | Ingresos y membresías por tipo de plan (y su tasa de renovación). |
-| **Comercial** | `DM_Avisos_Cobertura` | Cobertura de avisos preventivos (ventana 7 días). |
-| **Comercial** | `DM_Promociones_Ventas` | Ingresos, ventas y descuento otorgado por promoción. |
-| **Comercial** | `DM_Promociones_Membresias` | Membresías vendidas y renovadas por promoción y empleado. |
-| **Comercial** | `DM_Promociones_Clientes` | Clientes captados por promoción y segmento. |
-| **Entrenamiento** | `DM_Entrenamiento_Asistencia` | Tasa de asistencia por cliente y adherencia a sesiones. |
-| **Entrenamiento** | `DM_Entrenamiento_Progreso` | Porcentaje de avance de objetivos y clientes estancados. |
-| **Entrenamiento** | `DM_Entrenamiento_Cumplimiento` | Cumplimiento agregado de objetivos por período. |
-| **Entrenamiento** | `DM_Entrenamiento_Evaluaciones` | Evaluaciones exigibles vs. completadas y pendientes. |
-| **Entrenamiento** | `DM_Rutinas_Entrenador` | Asistencias por entrenador, rango etario y tipo de plan. |
-| **Atención** | `DM_Atencion_Reclamos` | Resolución general y **resolución directa en mostrador**. |
+| **Gerencia** | `DM_Gerencia_Membresias` | Clientes activos al inicio/cierre, retención y renovación de cohortes. |
+| **Comercial** | `DM_Comercial_Plan` | Ingresos, ventas, vencimientos y renovación por tipo de plan. |
+| **Comercial** | `DM_Comercial_Promociones` | Ingresos, membresías vendidas y clientes captados por promoción. |
+| **Comercial** | `DM_Avisos_Cobertura` | Cobertura de avisos preventivos (ventana 7 días) y avisos del día. |
+| **Atención** | `DM_Atencion_Reclamos` | Resolución general, **resolución directa en mostrador** y escalados. |
 | **Atención** | `DM_Atencion_Recepcion` | Atenciones por sexo, rango etario y categoría. |
-| **Atención** | `DM_Atencion_Retencion` | Éxito de retención en mostrador y motivos de posible baja. |
+| **Atención** | `DM_Atencion_Retencion` | No renovadas atendidas, recuperadas y éxito de retención. |
+| **Entrenamiento** | `DM_Entrenamiento_Asistencia` | Sesiones programadas vs. asistidas y tasa de asistencia. |
+| **Entrenamiento** | `DM_Entrenamiento_Accesos` | **Accesos registrados** y **días con acceso** por cliente. |
+| **Entrenamiento** | `DM_Entrenamiento_Progreso` | Valor inicial/actual/esperado, avance y % de progreso al corte. |
+| **Entrenamiento** | `DM_Entrenamiento_BajoProgreso` | Clientes con al menos un objetivo por debajo del 100%. |
+| **Entrenamiento** | `DM_Entrenamiento_Evaluaciones` | Evaluaciones exigibles, completadas y pendientes. |
+| **Entrenamiento** | `DM_Rutinas_Entrenador` | Sesiones asistidas por entrenador, segmento y plan. |
 
 > La trazabilidad de cada indicador contra el requerimiento corporativo está en
-> [`docs/OFICIAL1_CUMPLIMIENTO.md`](docs/OFICIAL1_CUMPLIMIENTO.md).
+> [`docs/CUMPLIMIENTO_V2.md`](docs/CUMPLIMIENTO_V2.md).
 
 ---
 
@@ -687,17 +231,17 @@ la auditoría ejecutable, en `sql/12_reglas_calidad.sql`.
 
 | Regla | Qué corrige |
 | :--- | :--- |
-| CAL-01/02 | DNI (formato a 8 dígitos) y nombre (mayúsculas, sin espacios dobles). |
-| CAL-03/04 | Sexo → `M/F/X`; estado del cliente → `ACTIVO/INACTIVO`. |
-| CAL-05/06 | Medio de pago a catálogo; montos negativos → `0`/`NULL`. |
-| CAL-07/08 | Fechas de cliente fuera de rango o inválidas → `NULL`. |
-| CAL-09 | Estado de membresía **recalculado** según la fecha de corte. |
-| CAL-10/11 | Horas de ingreso y antropometría (unidades y rangos). |
-| CAL-12/13 | Catálogos de reclamos, retenciones, objetivos, sesiones y planes. |
+| LIM-01/02 | DNI (formato a 8 dígitos) y nombre (mayúsculas, sin espacios dobles). |
+| LIM-06 | Código de empleado obligatorio (se deriva de `id_empleado_bk` si falta). |
+| EST-01/02 | Sexo → `M/F/X`; estado del cliente → `ACTIVO/INACTIVO`. |
+| EST-04/06/07 | Catálogos de tipo de operación, estado de membresía y estado de sesión. |
+| FEC-01/02 | Membresías con fin anterior al inicio y estado incoherente con el corte. |
+| FEC-05 | Objetivos con fecha meta anterior al inicio. |
+| SNP-01..07 | Duplicados de corte, huecos en la serie, avisos posteriores al vencimiento y evaluaciones inconsistentes. |
 
 **Imputación auditada** (el hecho **siempre entra**; se imputa al centinela `-1` y queda registrado
-en `dq.RegistroImputaciones`): filas que **no resuelven su cliente o su fecha** (reglas IMP-*). Así
-no se pierde dinero y cada imputación es auditable con la vista `dq.V_ImputacionesPorRegla`.
+en `dq.RegistroImputaciones`): filas que **no resuelven su cliente o su fecha** (reglas IMP-01..16).
+Así no se pierde dinero y cada imputación es auditable con la vista `dq.V_ImputacionesPorRegla`.
 
 ---
 
@@ -710,33 +254,40 @@ La API (.NET 8) expone los indicadores del DW por **REST**, un **dashboard agreg
 
 | Actor | Endpoint | Contenido |
 | :--- | :--- | :--- |
-| **Gerencia General** | `GET /api/v1/actores/gerencia/dashboard` | Crecimiento y retención: ingresos, membresías, ventas. |
-| **Jefatura Comercial** | `GET /api/v1/actores/comercial/dashboard` | Planes y promociones, cobertura de avisos. |
-| **Coordinación de Entrenamiento** | `GET /api/v1/actores/entrenador/dashboard` | Asistencia, progreso, cumplimiento, rutinas, evaluaciones. |
+| **Gerencia General** | `GET /api/v1/actores/gerencia/dashboard` | Crecimiento y retención: ingresos y membresías. |
+| **Jefatura Comercial** | `GET /api/v1/actores/comercial/dashboard` | Planes, promociones y cobertura de avisos. |
+| **Coordinación de Entrenamiento** | `GET /api/v1/actores/entrenador/dashboard` | Asistencia, accesos, progreso, bajo progreso, evaluaciones y rutinas. |
 | **Recepción** | `GET /api/v1/actores/recepcion/dashboard` | Reclamos, atención y retención. |
 
 ### Indicadores por área (REST)
 
 | Actor | Endpoints |
 | :--- | :--- |
-| **Gerencia** | `/kpis/gerencia/ingresos`, `/kpis/gerencia/membresias`, `/kpis/ventas` |
-| **Comercial** | `/kpis/comercial/planes`, `/kpis/comercial/avisos-cobertura`, `/kpis/comercial/promociones/ventas`, `/kpis/comercial/promociones/membresias`, `/kpis/comercial/promociones/clientes` |
-| **Entrenamiento** | `/kpis/entrenamiento/asistencia`, `/progreso`, `/cumplimiento`, `/evaluaciones`, `/rutinas` |
+| **Gerencia** | `/kpis/gerencia/ingresos`, `/kpis/gerencia/membresias` |
+| **Comercial** | `/kpis/comercial/planes`, `/kpis/comercial/promociones`, `/kpis/comercial/avisos-cobertura` |
+| **Entrenamiento** | `/kpis/entrenamiento/asistencia`, `/accesos`, `/progreso`, `/bajo-progreso`, `/evaluaciones`, `/rutinas` |
 | **Recepción** | `/kpis/atencion/reclamos`, `/kpis/atencion/recepcion`, `/kpis/atencion/retencion` |
 
-> Prefijo `/api/v1`. Filtros por querystring: `desde`/`hasta` (año), `plan`, `categoria`,
+> Prefijo `/api/v1`. Filtros por querystring: `desde`/`hasta` (año), `plan`, `promocion`, `categoria`,
 > `skCliente`, `tipoObjetivo`, `entrenador`, `canal`.
 
 ### Escritura (operación del gimnasio)
 
 `POST /api/v1/{clientes, empleados, membresias, ventas, renovaciones, avisos, asistencias,
 objetivos, evaluaciones, reclamos, sesiones-programadas, evaluaciones-programadas, retenciones}` —
-simulan la web del gimnasio; cada cambio lo captura CDC.
+simulan la web del gimnasio; cada cambio lo captura CDC. Las columnas nuevas de la reestructuración
+(`codigoEmpleado`, `skFechaMeta`, `fechaCierre`/`escalado`/`areaResponsable`, `fechaCancelacion`)
+viajan en el mismo endpoint que ya existía.
 
 ### OData (Power BI) y monitoreo
 
-* `/odata/DM_*` con `$select`, `$filter`, `$orderby`, `$top`, `$count` (un *entity set* por vista, incluyendo `DM_Promociones_Ventas`, `DM_Promociones_Membresias` y `DM_Promociones_Clientes`).
-* `GET /api/v1/etl/estado` — estado del pipeline (marca de agua CDC + ETL).
+* `/odata/DM_*` — 14 *entity sets* de KPIs con `$select`, `$filter`, `$orderby`, `$top`, `$count`.
+* `/odata/{DimFecha, DimCliente, DimEmpleado, DimPlan}` y
+  `/odata/{FactVentas, FactMembresias, FactAsistencias, FactSesionesEntrenamiento,
+  FactSeguimientoFisico, FactReclamos, FactRetenciones}` — **modelo en estrella** para importar en
+  Power BI y relacionar por las claves `sk_*`. Los hechos aceptan `fechaDesde`/`fechaHasta`
+  (ventana aplicada en SQL).
+* `GET /api/v1/etl/estado` — estado del pipeline (marca de agua CDC + ETL + snapshots).
 * `GET /health` — salud del servicio.
 
 > Catálogo detallado de endpoints y ejemplos en [`docs/API.md`](docs/API.md).
@@ -758,7 +309,7 @@ sequenceDiagram
   Note over CDC: captura continua (~5 seg)
   CDC->>STG: cada 10 min (marca de agua LSN)
   Note over STG: sin limpiar (raw)
-  STG->>DW: limpieza, estandarización y calidad
+  STG->>DW: dims -> hechos de evento -> snapshots diarios
   Note over DW: MERGE por clave de negocio (solo filas nuevas)
   DW-->>Consumo: vistas DM_* y dashboards por actor
 ```
@@ -775,10 +326,18 @@ cd vip-center-fit-bi
 npm install
 cp .env.example .env
 
-npm run db:bootstrap   # SQL Server + CDC + ETL inicial + vistas + reglas de calidad
+npm run db:bootstrap   # SQL Server + CDC + ETL inicial + snapshots + vistas + reglas de calidad
 npm run uml            # genera el ERD (Prisma + Mermaid)
 
 docker compose up -d --build api   # API en http://localhost:5080 (Swagger en /swagger)
+```
+
+Generar datos y ejecutar las pruebas de carga:
+
+```bash
+dotnet run --project src/VipCenterFit.Seeder -- --seed 1234 --clientes 200 --out jmeter/data
+jmeter -n -t jmeter/lectura-kpis.jmx -l resultados/lectura.jtl -e -o resultados/lectura-html
+jmeter -n -t jmeter/escritura-oltp.jmx -l resultados/escritura.jtl -e -o resultados/escritura-html
 ```
 
 ---
@@ -788,7 +347,7 @@ docker compose up -d --build api   # API en http://localhost:5080 (Swagger en /s
 | Documento | Contenido |
 | :--- | :--- |
 | 📘 [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md) | Blueprint de 7 etapas del pipeline y diseño en constelación. |
-| 📊 [`docs/OFICIAL1_CUMPLIMIENTO.md`](docs/OFICIAL1_CUMPLIMIENTO.md) | Trazabilidad de cada indicador contra el requerimiento corporativo. |
+| 📊 [`docs/CUMPLIMIENTO_V2.md`](docs/CUMPLIMIENTO_V2.md) | Trazabilidad de cada indicador contra el requerimiento v2. |
 | 🔌 [`docs/API.md`](docs/API.md) | Catálogo completo de endpoints REST/OData. |
 | 🧪 [`docs/CALIDAD.md`](docs/CALIDAD.md) | Catálogo de reglas de calidad (corrección e imputación). |
 | 🛠️ [`docs/OPERACION.md`](docs/OPERACION.md) | Runbook: jobs, backups y seguridad. |

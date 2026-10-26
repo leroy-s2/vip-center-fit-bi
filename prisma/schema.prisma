@@ -9,300 +9,297 @@ datasource db {
 }
 
 model DimCliente {
-  sk_cliente                  Int                           @id(map: "PK__DimClien__78CB69CC2D0A9BFA") @default(autoincrement())
-  sk_cliente_origen           Int?
-  id_cliente_bk               Int                           @unique(map: "UQ__DimClien__C039A18CE7620A06")
-  dni                         String?                       @db.VarChar(8)
-  nombre_completo             String                        @db.VarChar(250)
-  sexo                        String                        @db.Char(1)
-  rango_etario                String?                       @db.VarChar(50)
-  estado_cliente              String                        @db.VarChar(30)
-  fecha_registro_origen       DateTime?                     @db.Date
-  fecha_inicio_validez        DateTime?                     @db.Date
-  fecha_fin_validez           DateTime?                     @db.Date
-  es_actual                   Boolean
-  FactAsistencias             FactAsistencias[]
-  FactAvisos                  FactAvisos[]
-  FactEvaluaciones            FactEvaluaciones[]
-  FactEvaluacionesProgramadas FactEvaluacionesProgramadas[]
-  FactMembresias              FactMembresias[]
-  FactObjetivos               FactObjetivos[]
-  FactReclamos                FactReclamos[]
-  FactRenovaciones            FactRenovaciones[]
-  FactRetenciones             FactRetenciones[]
-  FactSesionesProgramadas     FactSesionesProgramadas[]
-  FactVentas                  FactVentas[]
+  sk_cliente                Int                         @id(map: "PK_DimCliente") @default(autoincrement())
+  sk_cliente_origen         Int?
+  id_cliente_bk             Int                         @unique(map: "UQ_DimCliente_IdClienteBk")
+  dni                       String?                     @db.VarChar(8)
+  nombre_completo           String                      @db.VarChar(250)
+  sexo                      String                      @db.Char(1)
+  rango_etario              String?                     @db.VarChar(50)
+  estado_cliente            String                      @db.VarChar(30)
+  fecha_registro_origen     DateTime?                   @db.Date
+  fecha_inicio_validez      DateTime?                   @db.Date
+  fecha_fin_validez         DateTime?                   @db.Date
+  es_actual                 Boolean
+  FactAsistencias           FactAsistencias[]
+  FactMembresias            FactMembresias[]
+  FactReclamos              FactReclamos[]
+  FactRetenciones           FactRetenciones[]
+  FactSeguimientoFisico     FactSeguimientoFisico[]
+  FactSesionesEntrenamiento FactSesionesEntrenamiento[]
+  FactVentas                FactVentas[]
 
   @@schema("dim")
 }
 
 model DimEmpleado {
-  sk_empleado                 Int                           @id(map: "PK__DimEmple__FED8200F528EF1C3") @default(autoincrement())
-  sk_empleado_origen          Int?
-  id_empleado_bk              Int                           @unique(map: "UQ__DimEmple__57309A2980CC7A8E")
-  dni                         String?                       @db.VarChar(20)
-  nombre_completo             String                        @db.VarChar(250)
-  cargo                       String                        @db.VarChar(60)
-  area                        String                        @db.VarChar(60)
-  FactAsistencias             FactAsistencias[]
-  FactAvisos                  FactAvisos[]
-  FactEvaluaciones            FactEvaluaciones[]
-  FactEvaluacionesProgramadas FactEvaluacionesProgramadas[]
-  FactMembresias              FactMembresias[]
-  FactReclamos                FactReclamos[]
-  FactRenovaciones            FactRenovaciones[]
-  FactRetenciones             FactRetenciones[]
-  FactSesionesProgramadas     FactSesionesProgramadas[]
-  FactVentas                  FactVentas[]
+  sk_empleado               Int                         @id(map: "PK_DimEmpleado") @default(autoincrement())
+  sk_empleado_origen        Int?
+  id_empleado_bk            Int                         @unique(map: "UQ_DimEmpleado_IdEmpleadoBk")
+  codigo_empleado           String                      @unique(map: "UQ_DimEmpleado_Codigo") @db.VarChar(20)
+  dni                       String?                     @db.VarChar(20)
+  nombre_completo           String                      @db.VarChar(250)
+  cargo                     String                      @db.VarChar(60)
+  area                      String                      @db.VarChar(60)
+  FactAsistencias           FactAsistencias[]
+  FactMembresias            FactMembresias[]
+  FactReclamos              FactReclamos[]
+  FactRetenciones           FactRetenciones[]
+  FactSeguimientoFisico     FactSeguimientoFisico[]
+  FactSesionesEntrenamiento FactSesionesEntrenamiento[]
+  FactVentas                FactVentas[]
 
   @@schema("dim")
 }
 
 model DimFecha {
-  sk_fecha                                                Int                           @id(map: "PK__DimFecha__18FB76FFED5E26D7")
-  fecha                                                   DateTime                      @unique(map: "UQ__DimFecha__E114132289E169C1") @db.Date
-  anio                                                    Int
-  trimestre                                               Int
-  semestre                                                Int
-  mes                                                     Int
-  nombre_mes                                              String                        @db.VarChar(30)
-  dia                                                     Int
-  dia_semana                                              String                        @db.VarChar(30)
-  es_fin_de_semana                                        Boolean
-  FactAsistencias                                         FactAsistencias[]
-  FactAvisos                                              FactAvisos[]
-  FactEvaluaciones                                        FactEvaluaciones[]
-  FactEvaluacionesProgramadas                             FactEvaluacionesProgramadas[]
-  FactMembresias_FactMembresias_sk_fecha_finToDimFecha    FactMembresias[]              @relation("FactMembresias_sk_fecha_finToDimFecha")
-  FactMembresias_FactMembresias_sk_fecha_inicioToDimFecha FactMembresias[]              @relation("FactMembresias_sk_fecha_inicioToDimFecha")
-  FactObjetivos                                           FactObjetivos[]
-  FactReclamos                                            FactReclamos[]
-  FactRenovaciones                                        FactRenovaciones[]
-  FactRetenciones                                         FactRetenciones[]
-  FactSesionesProgramadas                                 FactSesionesProgramadas[]
-  FactVentas                                              FactVentas[]
+  sk_fecha                             Int                         @id(map: "PK_DimFecha")
+  fecha                                DateTime                    @unique(map: "UQ_DimFecha_Fecha") @db.Date
+  anio                                 Int
+  trimestre                            Int
+  semestre                             Int
+  mes                                  Int
+  nombre_mes                           String                      @db.VarChar(30)
+  dia                                  Int
+  dia_semana                           String                      @db.VarChar(30)
+  es_fin_de_semana                     Boolean
+  FactAsistencias                      FactAsistencias[]
+  FactMembresiasAviso                  FactMembresias[]            @relation("FactMembresiasAviso")
+  FactMembresiasCorte                  FactMembresias[]            @relation("FactMembresiasCorte")
+  FactMembresiasFin                    FactMembresias[]            @relation("FactMembresiasFin")
+  FactMembresiasInicio                 FactMembresias[]            @relation("FactMembresiasInicio")
+  FactMembresiasRenovacion             FactMembresias[]            @relation("FactMembresiasRenovacion")
+  FactReclamosApertura                 FactReclamos[]              @relation("FactReclamosApertura")
+  FactReclamosCierre                   FactReclamos[]              @relation("FactReclamosCierre")
+  FactReclamosResolucion               FactReclamos[]              @relation("FactReclamosResolucion")
+  FactRetencionesAccion                FactRetenciones[]           @relation("FactRetencionesAccion")
+  FactRetencionesVencimiento           FactRetenciones[]           @relation("FactRetencionesVencimiento")
+  FactSeguimientoFisicoCorte           FactSeguimientoFisico[]     @relation("FactSeguimientoFisicoCorte")
+  FactSeguimientoFisicoInicio          FactSeguimientoFisico[]     @relation("FactSeguimientoFisicoInicio")
+  FactSeguimientoFisicoMeta            FactSeguimientoFisico[]     @relation("FactSeguimientoFisicoMeta")
+  FactSesionesEntrenamientoProgramada  FactSesionesEntrenamiento[] @relation("FactSesionesEntrenamientoProgramada")
+  FactSesionesEntrenamientoCancelacion FactSesionesEntrenamiento[] @relation("FactSesionesEntrenamientoCancelacion")
+  FactVentas                           FactVentas[]
 
   @@schema("dim")
 }
 
 model DimPlan {
-  sk_plan                 Int                       @id(map: "PK__DimPlan__FF3965EFE9A9A235") @default(autoincrement())
-  tipo_plan               String                    @db.VarChar(40)
-  tipo_operacion          String                    @db.VarChar(40)
-  promocion               String                    @db.VarChar(100)
-  FactAsistencias         FactAsistencias[]
-  FactMembresias          FactMembresias[]
-  FactSesionesProgramadas FactSesionesProgramadas[]
-  FactVentas              FactVentas[]
+  sk_plan                   Int                         @id(map: "PK_DimPlan") @default(autoincrement())
+  tipo_plan                 String                      @db.VarChar(40)
+  tipo_operacion            String                      @db.VarChar(40)
+  promocion                 String                      @db.VarChar(100)
+  FactAsistencias           FactAsistencias[]
+  FactMembresias            FactMembresias[]
+  FactSesionesEntrenamiento FactSesionesEntrenamiento[]
+  FactVentas                FactVentas[]
 
   @@unique([tipo_plan, tipo_operacion, promocion], map: "UQ_DimPlan_Combinacion")
   @@schema("dim")
 }
 
-model FactAsistencias {
-  sk_asistencia        BigInt       @id(map: "PK__FactAsis__6980D61D7C51E991") @default(autoincrement())
-  id_asistencia_bk     Int          @unique(map: "UQ__FactAsis__5D1FDF2D2BDD7733")
-  sk_fecha_asistencia  Int
-  sk_cliente           Int
-  sk_plan              Int?
-  sk_empleado          Int?
-  hora_ingreso         Int?
-  cantidad_asistencias Int
-  DimCliente           DimCliente   @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactAsistencias_DimCliente")
-  DimEmpleado          DimEmpleado? @relation(fields: [sk_empleado], references: [sk_empleado], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactAsistencias_DimEmpleado")
-  DimFecha             DimFecha     @relation(fields: [sk_fecha_asistencia], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactAsistencias_DimFecha")
-  DimPlan              DimPlan?     @relation(fields: [sk_plan], references: [sk_plan], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactAsistencias_DimPlan")
-
-  @@schema("dm_entrenamiento")
-}
-
-model FactAvisos {
-  sk_aviso               BigInt       @id(map: "PK__FactAvis__0BDBA5D0E6F68CF5") @default(autoincrement())
-  id_aviso_bk            Int          @unique(map: "UQ__FactAvis__2FEB9C90E6A308EE")
-  sk_fecha_aviso         Int
-  sk_cliente             Int
-  sk_empleado            Int?
-  id_membresia_bk        Int?
-  dias_antes_vencimiento Int?
-  medio                  String       @db.VarChar(30)
-  estado                 String       @db.VarChar(30)
-  DimCliente             DimCliente   @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactAvisos_DimCliente")
-  DimEmpleado            DimEmpleado? @relation(fields: [sk_empleado], references: [sk_empleado], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactAvisos_DimEmpleado")
-  DimFecha               DimFecha     @relation(fields: [sk_fecha_aviso], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactAvisos_DimFecha")
-
-  @@schema("dm_comercial")
-}
-
-model FactEvaluaciones {
-  sk_evaluacion       BigInt       @id(map: "PK__FactEval__9008F83A44F6060F") @default(autoincrement())
-  id_evaluacion_bk    Int          @unique(map: "UQ__FactEval__FF7F30E875C5B053")
-  sk_fecha_evaluacion Int
-  sk_cliente          Int
-  sk_empleado         Int?
-  id_objetivo_bk      Int?
-  peso                Decimal?     @db.Decimal(8, 2)
-  altura              Decimal?     @db.Decimal(8, 2)
-  grasa_corporal      Decimal?     @db.Decimal(8, 2)
-  masa_muscular       Decimal?     @db.Decimal(8, 2)
-  DimCliente          DimCliente   @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactEvaluaciones_DimCliente")
-  DimEmpleado         DimEmpleado? @relation(fields: [sk_empleado], references: [sk_empleado], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactEvaluaciones_DimEmpleado")
-  DimFecha            DimFecha     @relation(fields: [sk_fecha_evaluacion], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactEvaluaciones_DimFecha")
-
-  @@schema("dm_entrenamiento")
-}
-
-model FactMembresias {
-  sk_membresia                                      BigInt        @id(map: "PK__FactMemb__48BD13B01E63E3EE") @default(autoincrement())
-  id_membresia_bk                                   Int           @unique(map: "UQ__FactMemb__4831A45D01DCCCF8")
-  sk_cliente                                        Int
-  sk_plan                                           Int
-  sk_empleado                                       Int?
-  sk_fecha_inicio                                   Int
-  sk_fecha_fin                                      Int
-  duracion_dias                                     Int?
-  precio_final                                      Decimal?      @db.Decimal(12, 2)
-  es_renovacion                                     Boolean
-  estado_membresia                                  String        @db.VarChar(30)
-  dias_anticipacion_renovacion                      Int?
-  DimCliente                                        DimCliente    @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactMembresias_DimCliente")
-  DimEmpleado                                       DimEmpleado?  @relation(fields: [sk_empleado], references: [sk_empleado], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactMembresias_DimEmpleado")
-  DimFecha_FactMembresias_sk_fecha_finToDimFecha    DimFecha      @relation("FactMembresias_sk_fecha_finToDimFecha", fields: [sk_fecha_fin], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactMembresias_DimFechaFin")
-  DimFecha_FactMembresias_sk_fecha_inicioToDimFecha DimFecha      @relation("FactMembresias_sk_fecha_inicioToDimFecha", fields: [sk_fecha_inicio], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactMembresias_DimFechaInicio")
-  DimPlan                                           DimPlan       @relation(fields: [sk_plan], references: [sk_plan], onUpdate: NoAction, map: "FK_FactMembresias_DimPlan")
-
-  @@schema("dm_comercial")
-}
-
-model FactObjetivos {
-  sk_objetivo     BigInt     @id(map: "PK__FactObje__71EFDB0F8B9B47E4") @default(autoincrement())
-  id_objetivo_bk  Int        @unique(map: "UQ__FactObje__78C2C98C6D2EB447")
-  sk_fecha_inicio Int
-  sk_cliente      Int
-  tipo_objetivo   String     @db.VarChar(60)
-  valor_inicial   Decimal?   @db.Decimal(10, 2)
-  valor_objetivo  Decimal?   @db.Decimal(10, 2)
-  unidad_medida   String     @db.VarChar(30)
-  estado          String     @db.VarChar(30)
-  DimCliente      DimCliente @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactObjetivos_DimCliente")
-  DimFecha        DimFecha   @relation(fields: [sk_fecha_inicio], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactObjetivos_DimFecha")
-
-  @@schema("dm_entrenamiento")
-}
-
-model FactReclamos {
-  sk_reclamo            BigInt       @id(map: "PK__FactRecl__E753C5315AF5FE05") @default(autoincrement())
-  id_reclamo_bk         Int          @unique(map: "UQ__FactRecl__2316A17D424FC7AC")
-  sk_fecha_reclamo      Int
-  sk_cliente            Int
-  sk_empleado           Int?
-  categoria             String       @db.VarChar(60)
-  estado                String       @db.VarChar(30)
-  fecha_resolucion      DateTime?
-  dias_resolucion       Int?
-  resuelto_en_mostrador Boolean?
-  DimCliente            DimCliente   @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactReclamos_DimCliente")
-  DimEmpleado           DimEmpleado? @relation(fields: [sk_empleado], references: [sk_empleado], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactReclamos_DimEmpleado")
-  DimFecha              DimFecha     @relation(fields: [sk_fecha_reclamo], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactReclamos_DimFecha")
-
-  @@schema("dm_atencion")
-}
-
-model FactRenovaciones {
-  sk_renovacion            BigInt       @id(map: "PK__FactReno__676CB6823B78960C") @default(autoincrement())
-  id_renovacion_bk         Int          @unique(map: "UQ__FactReno__EBE93B3E9DFCB368")
-  sk_fecha_renovacion      Int
-  sk_cliente               Int
-  sk_empleado              Int?
-  id_membresia_anterior_bk Int?
-  id_membresia_nueva_bk    Int?
-  dias_anticipacion        Int?
-  monto                    Decimal?     @db.Decimal(12, 2)
-  DimCliente               DimCliente   @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactRenovaciones_DimCliente")
-  DimEmpleado              DimEmpleado? @relation(fields: [sk_empleado], references: [sk_empleado], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactRenovaciones_DimEmpleado")
-  DimFecha                 DimFecha     @relation(fields: [sk_fecha_renovacion], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactRenovaciones_DimFecha")
-
-  @@schema("dm_comercial")
-}
-
+/// Grano: un pago confirmado (id_pago_bk). Fecha de análisis: la del cobro.
 model FactVentas {
-  sk_venta           BigInt        @id(map: "PK__FactVent__4D088B28ECD7FD0A") @default(autoincrement())
-  id_pago_bk         Int           @unique(map: "UQ__FactVent__455E986D32D1C676")
+  sk_venta           BigInt      @id(map: "PK_FactVentas") @default(autoincrement())
+  id_pago_bk         Int         @unique(map: "UQ_FactVentas_IdPagoBk")
   sk_fecha_pago      Int
   sk_cliente         Int
   sk_plan            Int
-  sk_empleado        Int?
+  sk_empleado        Int
   id_membresia_bk    Int?
-  monto_neto         Decimal       @db.Decimal(12, 2)
-  descuento_aplicado Decimal?      @db.Decimal(12, 2)
-  precio_lista       Decimal?      @db.Decimal(12, 2)
-  metodo_pago        String        @db.VarChar(50)
-  DimCliente         DimCliente    @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactVentas_DimCliente")
-  DimEmpleado        DimEmpleado?  @relation(fields: [sk_empleado], references: [sk_empleado], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactVentas_DimEmpleado")
-  DimFecha           DimFecha      @relation(fields: [sk_fecha_pago], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactVentas_DimFecha")
-  DimPlan            DimPlan       @relation(fields: [sk_plan], references: [sk_plan], onUpdate: NoAction, map: "FK_FactVentas_DimPlan")
+  monto_neto         Decimal     @db.Decimal(12, 2)
+  descuento_aplicado Decimal?    @db.Decimal(12, 2)
+  precio_lista       Decimal?    @db.Decimal(12, 2)
+  metodo_pago        String      @db.VarChar(50)
+  DimCliente         DimCliente  @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactVentas_DimCliente")
+  DimEmpleado        DimEmpleado @relation(fields: [sk_empleado], references: [sk_empleado], onUpdate: NoAction, map: "FK_FactVentas_DimEmpleado")
+  DimFecha           DimFecha    @relation(fields: [sk_fecha_pago], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactVentas_DimFecha")
+  DimPlan            DimPlan     @relation(fields: [sk_plan], references: [sk_plan], onUpdate: NoAction, map: "FK_FactVentas_DimPlan")
 
+  @@index([sk_fecha_pago], map: "IX_FactVentas_Fecha")
   @@schema("dm_comercial")
 }
 
+/// Grano: una membresía de un cliente en una fecha de corte diaria
+/// (id_membresia_bk + sk_fecha_corte). Absorbe renovaciones y avisos.
+model FactMembresias {
+  sk_membresia                 BigInt      @id(map: "PK_FactMembresias") @default(autoincrement())
+  id_membresia_bk              Int
+  sk_fecha_corte               Int
+  sk_cliente                   Int
+  sk_plan                      Int
+  sk_empleado                  Int
+  sk_fecha_inicio              Int
+  sk_fecha_fin                 Int
+  duracion_dias                Int?
+  precio_final                 Decimal?    @db.Decimal(12, 2)
+  estado_membresia             String      @db.VarChar(30)
+  dias_desde_vencimiento       Int?
+  es_renovacion                Boolean
+  id_membresia_anterior_bk     Int?
+  id_membresia_nueva_bk        Int?
+  sk_fecha_renovacion          Int?
+  dias_anticipacion_renovacion Int?
+  monto_renovacion             Decimal?    @db.Decimal(12, 2)
+  aviso_emitido                Boolean
+  sk_fecha_aviso               Int?
+  dias_antes_vencimiento       Int?
+  medio_aviso                  String?     @db.VarChar(30)
+  estado_aviso                 String?     @db.VarChar(30)
+  avisos_emitidos_dia          Int
+  DimCliente                   DimCliente  @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactMembresias_DimCliente")
+  DimEmpleado                  DimEmpleado @relation(fields: [sk_empleado], references: [sk_empleado], onUpdate: NoAction, map: "FK_FactMembresias_DimEmpleado")
+  DimFechaAviso                DimFecha?   @relation("FactMembresiasAviso", fields: [sk_fecha_aviso], references: [sk_fecha], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactMembresias_DimFechaAviso")
+  DimFechaCorte                DimFecha    @relation("FactMembresiasCorte", fields: [sk_fecha_corte], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactMembresias_DimFechaCorte")
+  DimFechaFin                  DimFecha    @relation("FactMembresiasFin", fields: [sk_fecha_fin], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactMembresias_DimFechaFin")
+  DimFechaInicio               DimFecha    @relation("FactMembresiasInicio", fields: [sk_fecha_inicio], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactMembresias_DimFechaInicio")
+  DimFechaRenovacion           DimFecha?   @relation("FactMembresiasRenovacion", fields: [sk_fecha_renovacion], references: [sk_fecha], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactMembresias_DimFechaRenovacion")
+  DimPlan                      DimPlan     @relation(fields: [sk_plan], references: [sk_plan], onUpdate: NoAction, map: "FK_FactMembresias_DimPlan")
+
+  @@unique([id_membresia_bk, sk_fecha_corte], map: "UQ_FactMembresias_Grano")
+  @@index([sk_fecha_corte, estado_membresia], map: "IX_FactMembresias_Corte")
+  @@schema("dm_comercial")
+}
+
+/// Grano: una marcación real de acceso al gimnasio (id_asistencia_bk).
+model FactAsistencias {
+  sk_asistencia        BigInt      @id(map: "PK_FactAsistencias") @default(autoincrement())
+  id_asistencia_bk     Int         @unique(map: "UQ_FactAsistencias_IdAsistenciaBk")
+  sk_fecha_asistencia  Int
+  sk_cliente           Int
+  sk_plan              Int
+  sk_empleado          Int
+  hora_ingreso         Int?
+  cantidad_asistencias Int
+  es_acceso_valido     Boolean
+  DimCliente           DimCliente  @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactAsistencias_DimCliente")
+  DimEmpleado          DimEmpleado @relation(fields: [sk_empleado], references: [sk_empleado], onUpdate: NoAction, map: "FK_FactAsistencias_DimEmpleado")
+  DimFecha             DimFecha    @relation(fields: [sk_fecha_asistencia], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactAsistencias_DimFecha")
+  DimPlan              DimPlan     @relation(fields: [sk_plan], references: [sk_plan], onUpdate: NoAction, map: "FK_FactAsistencias_DimPlan")
+
+  @@index([sk_fecha_asistencia], map: "IX_FactAsistencias_Fecha")
+  @@schema("dm_entrenamiento")
+}
+
+/// Grano: una sesión programada (id_sesion_bk), con su cancelación y resultado.
+model FactSesionesEntrenamiento {
+  sk_sesion            BigInt      @id(map: "PK_FactSesionesEntrenamiento") @default(autoincrement())
+  id_sesion_bk         Int         @unique(map: "UQ_FactSesionesEntrenamiento_IdSesionBk")
+  sk_fecha_programada  Int
+  sk_cliente           Int
+  sk_plan              Int
+  sk_empleado          Int
+  tipo_sesion          String      @db.VarChar(40)
+  hora_programada      Int?
+  estado_sesion        String      @db.VarChar(30)
+  asistio              Boolean
+  duracion_minutos     Int?
+  sk_fecha_cancelacion Int?
+  motivo_cancelacion   String?     @db.VarChar(60)
+  DimCliente           DimCliente  @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactSesionesEntrenamiento_DimCliente")
+  DimEmpleado          DimEmpleado @relation(fields: [sk_empleado], references: [sk_empleado], onUpdate: NoAction, map: "FK_FactSesionesEntrenamiento_DimEmpleado")
+  DimFechaProgramada   DimFecha    @relation("FactSesionesEntrenamientoProgramada", fields: [sk_fecha_programada], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactSesionesEntrenamiento_DimFecha")
+  DimFechaCancelacion  DimFecha?   @relation("FactSesionesEntrenamientoCancelacion", fields: [sk_fecha_cancelacion], references: [sk_fecha], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactSesionesEntrenamiento_DimFechaCancelacion")
+  DimPlan              DimPlan     @relation(fields: [sk_plan], references: [sk_plan], onUpdate: NoAction, map: "FK_FactSesionesEntrenamiento_DimPlan")
+
+  @@index([sk_fecha_programada], map: "IX_FactSesiones_Fecha")
+  @@schema("dm_entrenamiento")
+}
+
+/// Grano: un cliente, un objetivo y una fecha de corte diaria.
+/// Consolida objetivos, evaluaciones y evaluaciones programadas.
+model FactSeguimientoFisico {
+  sk_seguimiento              BigInt      @id(map: "PK_FactSeguimientoFisico") @default(autoincrement())
+  id_objetivo_bk              Int
+  sk_cliente                  Int
+  sk_empleado                 Int
+  sk_fecha_corte              Int
+  sk_fecha_inicio             Int
+  sk_fecha_meta               Int
+  id_evaluacion_bk            Int?
+  id_evaluacion_programada_bk Int?
+  tipo_objetivo               String      @db.VarChar(60)
+  unidad_medida               String      @db.VarChar(30)
+  estado_objetivo             String      @db.VarChar(30)
+  valor_inicial               Decimal?    @db.Decimal(10, 2)
+  valor_actual                Decimal?    @db.Decimal(10, 2)
+  valor_esperado              Decimal?    @db.Decimal(10, 2)
+  avance_alcanzado            Decimal?    @db.Decimal(10, 2)
+  avance_esperado             Decimal?    @db.Decimal(10, 2)
+  porcentaje_progreso         Decimal?    @db.Decimal(9, 2)
+  peso                        Decimal?    @db.Decimal(8, 2)
+  altura                      Decimal?    @db.Decimal(8, 2)
+  grasa_corporal              Decimal?    @db.Decimal(8, 2)
+  masa_muscular               Decimal?    @db.Decimal(8, 2)
+  evaluacion_exigible         Boolean
+  evaluacion_completada       Boolean
+  evaluacion_pendiente        Boolean
+  estado_evaluacion           String      @db.VarChar(30)
+  DimCliente                  DimCliente  @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactSeguimientoFisico_DimCliente")
+  DimEmpleado                 DimEmpleado @relation(fields: [sk_empleado], references: [sk_empleado], onUpdate: NoAction, map: "FK_FactSeguimientoFisico_DimEmpleado")
+  DimFechaCorte               DimFecha    @relation("FactSeguimientoFisicoCorte", fields: [sk_fecha_corte], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactSeguimientoFisico_DimFechaCorte")
+  DimFechaInicio              DimFecha    @relation("FactSeguimientoFisicoInicio", fields: [sk_fecha_inicio], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactSeguimientoFisico_DimFechaInicio")
+  DimFechaMeta                DimFecha    @relation("FactSeguimientoFisicoMeta", fields: [sk_fecha_meta], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactSeguimientoFisico_DimFechaMeta")
+
+  @@unique([sk_cliente, id_objetivo_bk, sk_fecha_corte], map: "UQ_FactSeguimientoFisico_Grano")
+  @@index([sk_fecha_corte, id_objetivo_bk], map: "IX_FactSeguimiento_Corte")
+  @@schema("dm_entrenamiento")
+}
+
+/// Grano: un reclamo registrado (id_reclamo_bk), con sus hitos de resolución.
+model FactReclamos {
+  sk_reclamo            BigInt      @id(map: "PK_FactReclamos") @default(autoincrement())
+  id_reclamo_bk         Int         @unique(map: "UQ_FactReclamos_IdReclamoBk")
+  sk_fecha_reclamo      Int
+  sk_cliente            Int
+  sk_empleado           Int
+  categoria             String      @db.VarChar(60)
+  estado                String      @db.VarChar(30)
+  sk_fecha_resolucion   Int?
+  sk_fecha_cierre       Int?
+  dias_resolucion       Int?
+  resuelto_en_mostrador Boolean?
+  escalado              Boolean
+  area_responsable      String?     @db.VarChar(60)
+  DimCliente            DimCliente  @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactReclamos_DimCliente")
+  DimEmpleado           DimEmpleado @relation(fields: [sk_empleado], references: [sk_empleado], onUpdate: NoAction, map: "FK_FactReclamos_DimEmpleado")
+  DimFechaApertura      DimFecha    @relation("FactReclamosApertura", fields: [sk_fecha_reclamo], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactReclamos_DimFecha")
+  DimFechaCierre        DimFecha?   @relation("FactReclamosCierre", fields: [sk_fecha_cierre], references: [sk_fecha], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactReclamos_DimFechaCierre")
+  DimFechaResolucion    DimFecha?   @relation("FactReclamosResolucion", fields: [sk_fecha_resolucion], references: [sk_fecha], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactReclamos_DimFechaResolucion")
+
+  @@index([sk_fecha_reclamo], map: "IX_FactReclamos_Fecha")
+  @@schema("dm_atencion")
+}
+
+/// Grano: una acción de retención ejecutada (id_retencion_bk).
+model FactRetenciones {
+  sk_retencion         BigInt      @id(map: "PK_FactRetenciones") @default(autoincrement())
+  id_retencion_bk      Int         @unique(map: "UQ_FactRetenciones_IdRetencionBk")
+  sk_fecha_retencion   Int
+  sk_cliente           Int
+  sk_empleado          Int
+  id_membresia_bk      Int?
+  sk_fecha_vencimiento Int?
+  canal                String      @db.VarChar(40)
+  motivo               String      @db.VarChar(60)
+  resultado            String      @db.VarChar(30)
+  recuperada           Boolean
+  monto_oferta         Decimal?    @db.Decimal(12, 2)
+  DimCliente           DimCliente  @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactRetenciones_DimCliente")
+  DimEmpleado          DimEmpleado @relation(fields: [sk_empleado], references: [sk_empleado], onUpdate: NoAction, map: "FK_FactRetenciones_DimEmpleado")
+  DimFechaAccion       DimFecha    @relation("FactRetencionesAccion", fields: [sk_fecha_retencion], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactRetenciones_DimFecha")
+  DimFechaVencimiento  DimFecha?   @relation("FactRetencionesVencimiento", fields: [sk_fecha_vencimiento], references: [sk_fecha], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactRetenciones_DimFechaVencimiento")
+
+  @@index([sk_fecha_retencion], map: "IX_FactRetenciones_Fecha")
+  @@schema("dm_atencion")
+}
+
+/// Marcas de agua del ETL. Incluye las dos marcas de snapshot diario.
 model etl_control {
-  proceso            String    @id(map: "PK__etl_cont__A494BD99AF963511") @db.NVarChar(128)
-  ultimo_staging_id  BigInt    @default(0, map: "DF__etl_contr__ultim__625A9A57")
+  proceso            String    @id(map: "PK_etl_control") @db.NVarChar(128)
+  ultimo_staging_id  BigInt    @default(0, map: "DF_etl_control_ultimo_staging_id")
   ultima_carga       DateTime?
   filas_ultima_carga BigInt?
 
   @@schema("dbo")
-}
-
-model FactEvaluacionesProgramadas {
-  sk_evaluacion_programada    BigInt       @id(map: "PK__FactEval__5653127EA70F8C6A") @default(autoincrement())
-  id_evaluacion_programada_bk Int          @unique(map: "UQ__FactEval__3F273B73C7EBBBBC")
-  sk_fecha_programada         Int
-  sk_cliente                  Int
-  sk_empleado                 Int?
-  id_objetivo_bk              Int?
-  tipo_evaluacion             String       @db.VarChar(40)
-  estado_evaluacion           String       @db.VarChar(30)
-  id_evaluacion_bk            Int?
-  DimCliente                  DimCliente   @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactEvaluacionesProgramadas_DimCliente")
-  DimEmpleado                 DimEmpleado? @relation(fields: [sk_empleado], references: [sk_empleado], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactEvaluacionesProgramadas_DimEmpleado")
-  DimFecha                    DimFecha     @relation(fields: [sk_fecha_programada], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactEvaluacionesProgramadas_DimFecha")
-
-  @@schema("dm_entrenamiento")
-}
-
-model FactRetenciones {
-  sk_retencion       BigInt       @id(map: "PK__FactRete__EE14035B05F2A4D8") @default(autoincrement())
-  id_retencion_bk    Int          @unique(map: "UQ__FactRete__63F7F98D0CDD88AC")
-  sk_fecha_retencion Int
-  sk_cliente         Int
-  sk_empleado        Int?
-  id_membresia_bk    Int?
-  canal              String       @db.VarChar(40)
-  motivo             String       @db.VarChar(60)
-  resultado          String       @db.VarChar(30)
-  monto_oferta       Decimal?     @db.Decimal(12, 2)
-  DimCliente         DimCliente   @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactRetenciones_DimCliente")
-  DimEmpleado        DimEmpleado? @relation(fields: [sk_empleado], references: [sk_empleado], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactRetenciones_DimEmpleado")
-  DimFecha           DimFecha     @relation(fields: [sk_fecha_retencion], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactRetenciones_DimFecha")
-
-  @@schema("dm_atencion")
-}
-
-model FactSesionesProgramadas {
-  sk_sesion_programada BigInt       @id(map: "PK__FactSesi__623C583E4FC130C6") @default(autoincrement())
-  id_sesion_bk         Int          @unique(map: "UQ__FactSesi__8C6204CCDEA36CC4")
-  sk_fecha_programada  Int
-  sk_cliente           Int
-  sk_plan              Int?
-  sk_empleado          Int?
-  tipo_sesion          String       @db.VarChar(40)
-  hora_programada      Int?
-  estado_sesion        String       @db.VarChar(30)
-  duracion_minutos     Int?
-  DimCliente           DimCliente   @relation(fields: [sk_cliente], references: [sk_cliente], onUpdate: NoAction, map: "FK_FactSesionesProgramadas_DimCliente")
-  DimEmpleado          DimEmpleado? @relation(fields: [sk_empleado], references: [sk_empleado], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactSesionesProgramadas_DimEmpleado")
-  DimFecha             DimFecha     @relation(fields: [sk_fecha_programada], references: [sk_fecha], onUpdate: NoAction, map: "FK_FactSesionesProgramadas_DimFecha")
-  DimPlan              DimPlan?     @relation(fields: [sk_plan], references: [sk_plan], onDelete: NoAction, onUpdate: NoAction, map: "FK_FactSesionesProgramadas_DimPlan")
-
-  @@schema("dm_entrenamiento")
 }

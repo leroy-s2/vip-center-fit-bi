@@ -58,7 +58,9 @@ GRANT SELECT ON SCHEMA::dim TO pbi_lector;
 GRANT SELECT ON SCHEMA::dm_comercial TO pbi_lector;
 GRANT SELECT ON SCHEMA::dm_entrenamiento TO pbi_lector;
 GRANT SELECT ON SCHEMA::dm_atencion TO pbi_lector;
-/* Las vistas de KPIs están en dbo (DM_*). */
+/* Las vistas de KPIs están en dbo (DM_*). El permiso de esquema cubre las 14
+   vistas. También habilita la importación directa del modelo en estrella
+   (4 dimensiones + 7 hechos) desde Power BI, alternativa al endpoint OData. */
 GRANT SELECT ON SCHEMA::dbo TO pbi_lector;
 DENY VIEW DEFINITION TO pbi_lector;
 GO

@@ -24,11 +24,14 @@ Severidades: **Alta** (afecta integridad/imputación de hechos) · **Media** (ca
 | CAL-06 | Limpieza | Montos (`monto_neto`, `precio_final`, `precio_lista`, `descuento_aplicado`) | Negativos o NULL | Alta | `monto_neto` NULL/negativo → `0`; otros negativos → `NULL` |
 | CAL-07 | Fechas | `DimCliente.fecha_*` | Fuera de `[2000-01-01, @FechaCorte]` | Media | → `NULL` |
 | CAL-08 | Fechas | `DimCliente.fecha_fin_validez` | Anterior a `fecha_inicio_validez` | Media | → `NULL` |
-| CAL-09 | Estados | `FactMembresias.estado_membresia` | Inconsistente con fechas | Alta | **Recalcula** (`ACTIVA`/`VENCIDA`/`PENDIENTE`) según `@FechaCorte` |
-| CAL-10 | Limpieza | `FactAsistencias.hora_ingreso` | Fuera de `[5, 23]` | Baja | → `NULL` |
-| CAL-11 | Limpieza | `FactEvaluaciones.peso/altura` | Fuera de rango o unidad distinta | Media | `lb→kg`, `cm→m`; fuera de rango → `NULL` |
-| CAL-12 | Estandarización | `FactReclamos`/`FactRetenciones`/`FactObjetivos`/sesiones | Texto libre | Baja | Mapea a dominios (COBRO/SERVICIO, RESUELTO/PENDIENTE, canal, motivo, tipo…) |
+| CAL-09 | Estados | `FactMembresias.estado_membresia` | Inconsistente con las fechas | Alta | **Recalcula en cada corte** (`ACTIVA`/`VENCIDA`/`PENDIENTE`) según la fecha del snapshot |
+| CAL-10 | Limpieza | `FactAsistencias.hora_ingreso` | Fuera de `[5, 23]` | Baja | → `NULL` y `es_acceso_valido = 0` |
+| CAL-11 | Limpieza | `FactSeguimientoFisico.peso/altura` | Fuera de rango o unidad distinta | Media | `lb→kg`, `cm→m`; fuera de rango → `NULL` |
+| CAL-12 | Estandarización | `FactReclamos`/`FactRetenciones`/`FactSeguimientoFisico`/sesiones | Texto libre | Baja | Mapea a dominios (COBRO/SERVICIO, RESUELTO/PENDIENTE, canal, motivo, tipo de objetivo, tipo de sesión…) |
 | CAL-13 | Estandarización | `DimPlan` | Catálogo de planes | Media | Deriva `tipo_plan`, `tipo_operacion` y `promocion` |
+| CAL-14 | Estandarización | `DimEmpleado.codigo_empleado` | Ausente | Media | Deriva `EMP-<id_empleado_bk>` (regla IMP-13) |
+| CAL-15 | Fechas | `FactMembresias.sk_fecha_fin` | Anterior a `sk_fecha_inicio` | Alta | Ajusta al día de inicio (regla IMP-15) |
+| CAL-16 | Fechas | `FactMembresias.sk_fecha_meta` | Ausente en el objetivo | Media | Usa `inicio + 90 días`; el valor esperado queda plano (regla IMP-14) |
 
 ---
 
@@ -56,9 +59,33 @@ cargada. Las imputaciones se registran en `dq.RegistroImputaciones`.
 | IMP-10 | `FactReclamos` | `sk_fecha_reclamo` | No resuelve | Imputa `-1` + alerta |
 | IMP-11 | `FactRetenciones` | `sk_cliente` | No resuelve | Imputa `-1` + alerta |
 | IMP-12 | `FactRetenciones` | `sk_fecha_retencion` | No resuelve | Imputa `-1` + alerta |
+| IMP-13 | `DimEmpleado` | `codigo_empleado` | Ausente | Deriva `EMP-<id_empleado_bk>` |
+| IMP-14 | `FactSeguimientoFisico` | `sk_fecha_meta` | Ausente en el objetivo | Usa `inicio + 90 días`; el valor esperado queda plano |
+| IMP-15 | `FactMembresias` | `sk_fecha_fin` | Anterior a `sk_fecha_inicio` | Ajusta `fin = inicio` |
+| IMP-16 | `FactMembresias` | `sk_fecha_aviso` | Posterior al vencimiento | Descarta el aviso del snapshot (no es aviso de renovación) |
 
 Las FK de hechos a empleado/plan (`sk_empleado`, `sk_plan`) son **`NOT NULL`** y también se
 imputan al centinela cuando no resuelven.
+
+### 2.1 Reglas propias de los snapshots diarios (SNP-*)
+
+`FactMembresias` y `FactSeguimientoFisico` tienen grano *clave de negocio + fecha de corte*. Además
+de las reglas anteriores, el ETL y la auditoría verifican:
+
+| ID | Entidad | Condición | Severidad | Acción |
+| :--- | :--- | :--- | :---: | :--- |
+| SNP-01 | `FactMembresias` | Corte duplicado (`id_membresia_bk` + `sk_fecha_corte`) | Alta | El MERGE actualiza la fila existente, nunca inserta un duplicado |
+| SNP-02 | `FactSeguimientoFisico` | Corte duplicado (`sk_cliente` + `id_objetivo_bk` + `sk_fecha_corte`) | Alta | Igual que SNP-01 |
+| SNP-03 | `FactMembresias` | Corte anterior al inicio del contrato | Alta | La ventana arranca en `sk_fecha_inicio` |
+| SNP-04 | `FactMembresias` | `aviso_emitido` retrocede en la serie | Media | El flag es acumulado: una vez emitido no vuelve a 0 |
+| SNP-05 | `FactMembresias` | Aviso con fecha posterior al vencimiento | Media | Se descarta del snapshot (IMP-16) |
+| SNP-06 | `FactSeguimientoFisico` | `evaluacion_completada = 1` sin `id_evaluacion_bk` | Alta | Deriva del último registro de evaluación ≤ corte |
+| SNP-07 | `FactSeguimientoFisico` | `evaluacion_pendiente` incoherente | Alta | `pendiente = exigible AND NOT completada` |
+
+**Reglas temporales del snapshot de seguimiento físico:** `valor_actual` usa la última evaluación
+con fecha ≤ corte (nunca una posterior) y `valor_esperado` interpola linealmente entre
+`valor_inicial` y `valor_objetivo` en `[sk_fecha_inicio, sk_fecha_meta]`. No se inventan mediciones
+diarias.
 
 ### Bitácora `dq.RegistroImputaciones`
 
@@ -88,6 +115,7 @@ Se consulta con la vista `dq.V_ImputacionesPorRegla`.
 | 4 | Cálculo de cohortes | ✅ | `05` (`DM_Gerencia_Membresias`) + `12` bloque 4 |
 | 5 | Carga incremental | ✅ | `04` (`dbo.etl_control`, MERGE) + `12` bloque 5 |
 | 6 | Reglas de calidad | ✅ | `04` (CAL-*, IMP-*) + `12` bloque 6 (`dq.RegistroImputaciones`) |
+| 7 | Snapshots diarios (adicional v2) | ✅ | `04` fase C (motor de cortes) + `12` bloque 3c (SNP-*) |
 
 ---
 
@@ -99,8 +127,10 @@ Se consulta con la vista `dq.V_ImputacionesPorRegla`.
 - **Huérfanos**: ya no quedan `NULL`; se imputan al centinela `-1` (cliente/empleado/plan/fecha),
   pero no se distingue un huérfano real de un dato ausente.
 - **Sin política de severidad/escalamiento**: no hay notificación ni cuarentena por umbral de imputaciones.
-- **Auditoría de entrenamiento**: sesiones, objetivos y evaluaciones normalizan estados pero
-  aún no tienen control en el bloque 2/3 de `12`.
+- **Avisos múltiples**: el snapshot guarda el primer aviso válido y la cantidad del día; si una
+  membresía recibe avisos por canales distintos el mismo día, sólo se conserva el primero.
+- **`@DiasObservacion` fijo en 90**: es el parámetro del procedimiento, pero el job de 10 minutos lo
+  invoca con el valor por defecto; cambiarlo exige alterar el paso del job.
 - **DimCliente es SCD1** (sin historial): conserva marcas de validez del origen, pero no versiona.
 
 > Las reglas de esta sección son las candidatas a implementar en la próxima iteración; hoy

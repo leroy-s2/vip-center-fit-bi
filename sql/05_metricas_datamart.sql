@@ -1,17 +1,20 @@
 /*=============================================================================
   VIP CENTER FIT - ETAPA 5: DATA MART / MÉTRICAS
 
-  Estas consultas trabajan únicamente con el modelo limpio del Data Mart.
-  Las métricas se calculan en SQL para validarlas antes de conectarlas a
-  Power BI.
+  Vistas de métricas del modelo de 7 hechos (AEQUITECTURA BI v2):
 
-  Brechas del Excel OFICIAL1 ya cerradas en el origen:
-  - Tasa de asistencia: se incorpora FactSesionesProgramadas como denominador
-    (sesiones programadas) de las asistencias registradas.
-  - Resolución directa en mostrador: FactReclamos expone resuelto_en_mostrador.
-  - Evaluaciones programadas: FactEvaluacionesProgramadas aporta la fecha prevista
-    (exigibles, completadas y pendientes).
-  - Retención en mostrador: FactRetenciones registra la acción y su resultado.
+    dm_comercial      FactVentas, FactMembresias (snapshot diario)
+    dm_entrenamiento  FactAsistencias, FactSesionesEntrenamiento, FactSeguimientoFisico
+    dm_atencion       FactReclamos, FactRetenciones
+
+  REGLA DE ORO DE LOS SNAPSHOTS
+  -----------------------------
+  FactMembresias y FactSeguimientoFisico tienen grano (clave de negocio + fecha
+  de corte). Sus medidas de estado (membresías activas, progreso, evaluaciones
+  pendientes) se leen EN UN CORTE: nunca se suman entre días. Por eso cada vista
+  que las usa reduce primero a un corte vigente (fin de mes o último corte
+  disponible). Las cantidades de eventos (avisos emitidos, ventas, reclamos) sí
+  son aditivas.
 =============================================================================*/
 
 USE BI_VIP_CENTER_FIT_DW;
@@ -70,121 +73,112 @@ SELECT
 FROM ConAnterior;
 GO
 
-/* 2. Gerencia: clientes activos, membresías vencidas y renovaciones. */
+/* 2. Gerencia: clientes activos, retención, membresías activas y renovación.
+      Medidas de estado tomadas al corte de inicio y al corte de cierre del mes. */
 CREATE OR ALTER VIEW dbo.DM_Gerencia_Membresias
 AS
-WITH Periodos AS
+WITH Cortes AS
+(
+    SELECT DISTINCT
+        d.anio, d.mes, d.nombre_mes,
+        fm.sk_fecha_corte
+    FROM dbo.FactMembresias fm
+    INNER JOIN dbo.DimFecha d ON d.sk_fecha = fm.sk_fecha_corte
+),
+CorteCierre AS
+(
+    SELECT anio, mes, MAX(nombre_mes) AS nombre_mes, MAX(sk_fecha_corte) AS sk_corte_cierre
+    FROM Cortes
+    GROUP BY anio, mes
+),
+CorteInicio AS
 (
     SELECT
-        DATEFROMPARTS(anio, mes, 1) AS PeriodoInicio,
-        EOMONTH(DATEFROMPARTS(anio, mes, 1)) AS PeriodoFin,
-        anio,
-        mes,
-        MAX(nombre_mes) AS nombre_mes
-    FROM dbo.DimFecha
-    WHERE anio >= 2000
-    GROUP BY DATEFROMPARTS(anio, mes, 1), anio, mes
+        cc.anio,
+        cc.mes,
+        cc.nombre_mes,
+        cc.sk_corte_cierre,
+        (
+            SELECT MAX(c2.sk_fecha_corte)
+            FROM Cortes c2
+            INNER JOIN dbo.DimFecha d2 ON d2.sk_fecha = c2.sk_fecha_corte
+            WHERE d2.fecha <= DATEFROMPARTS(cc.anio, cc.mes, 1)
+        ) AS sk_corte_inicio
+    FROM CorteCierre cc
 ),
-ClientesInicio AS
+ActivosInicio AS
 (
-    SELECT p.PeriodoInicio, fm.sk_cliente
-    FROM Periodos p
-    INNER JOIN dbo.FactMembresias fm ON 1 = 1
-    INNER JOIN dbo.DimFecha fi ON fi.sk_fecha = fm.sk_fecha_inicio
-    INNER JOIN dbo.DimFecha ff ON ff.sk_fecha = fm.sk_fecha_fin
-    WHERE fi.fecha <= p.PeriodoInicio
-      AND ff.fecha >= p.PeriodoInicio
-    GROUP BY p.PeriodoInicio, fm.sk_cliente
+    SELECT ci.anio, ci.mes, COUNT(DISTINCT fm.sk_cliente) AS n
+    FROM CorteInicio ci
+    INNER JOIN dbo.FactMembresias fm
+        ON fm.sk_fecha_corte = ci.sk_corte_inicio
+       AND fm.estado_membresia = 'ACTIVA'
+    GROUP BY ci.anio, ci.mes
 ),
-ClientesCierre AS
+Retenidos AS
 (
-    SELECT p.PeriodoInicio, fm.sk_cliente
-    FROM Periodos p
-    INNER JOIN dbo.FactMembresias fm ON 1 = 1
-    INNER JOIN dbo.DimFecha fi ON fi.sk_fecha = fm.sk_fecha_inicio
-    INNER JOIN dbo.DimFecha ff ON ff.sk_fecha = fm.sk_fecha_fin
-    WHERE fi.fecha <= p.PeriodoFin
-      AND ff.fecha >= p.PeriodoFin
-    GROUP BY p.PeriodoInicio, fm.sk_cliente
-),
-Retencion AS
-(
-    SELECT
-        ci.PeriodoInicio,
-        COUNT(*) AS ClientesActivosInicio,
-        SUM(CASE WHEN cc.sk_cliente IS NOT NULL THEN 1 ELSE 0 END) AS ClientesInicioActivosCierre
-    FROM ClientesInicio ci
-    LEFT JOIN ClientesCierre cc
-        ON cc.PeriodoInicio = ci.PeriodoInicio
-       AND cc.sk_cliente = ci.sk_cliente
-    GROUP BY ci.PeriodoInicio
+    SELECT ci.anio, ci.mes, COUNT(DISTINCT fi.sk_cliente) AS n
+    FROM CorteInicio ci
+    INNER JOIN dbo.FactMembresias fi
+        ON fi.sk_fecha_corte = ci.sk_corte_inicio
+       AND fi.estado_membresia = 'ACTIVA'
+    INNER JOIN dbo.FactMembresias fc
+        ON fc.sk_fecha_corte = ci.sk_corte_cierre
+       AND fc.estado_membresia = 'ACTIVA'
+       AND fc.sk_cliente = fi.sk_cliente
+    GROUP BY ci.anio, ci.mes
 ),
 Activas AS
 (
-    SELECT
-        p.PeriodoInicio,
-        COUNT(DISTINCT fm.id_membresia_bk) AS MembresiasActivas
-    FROM Periodos p
-    INNER JOIN dbo.FactMembresias fm ON 1 = 1
-    INNER JOIN dbo.DimFecha fi ON fi.sk_fecha = fm.sk_fecha_inicio
-    INNER JOIN dbo.DimFecha ff ON ff.sk_fecha = fm.sk_fecha_fin
-    WHERE fi.fecha <= p.PeriodoFin
-      AND ff.fecha >= p.PeriodoFin
-    GROUP BY p.PeriodoInicio
+    SELECT ci.anio, ci.mes, COUNT(DISTINCT fm.id_membresia_bk) AS n
+    FROM CorteInicio ci
+    INNER JOIN dbo.FactMembresias fm
+        ON fm.sk_fecha_corte = ci.sk_corte_cierre
+       AND fm.estado_membresia = 'ACTIVA'
+    GROUP BY ci.anio, ci.mes
 ),
 Vencen AS
 (
-    SELECT
-        p.PeriodoInicio,
-        COUNT(DISTINCT fm.id_membresia_bk) AS MembresiasVencenPeriodo
-    FROM Periodos p
-    INNER JOIN dbo.FactMembresias fm ON 1 = 1
-    INNER JOIN dbo.DimFecha ff ON ff.sk_fecha = fm.sk_fecha_fin
-    WHERE ff.fecha BETWEEN p.PeriodoInicio AND p.PeriodoFin
-    GROUP BY p.PeriodoInicio
+    SELECT d.anio, d.mes, COUNT(DISTINCT fm.id_membresia_bk) AS n
+    FROM dbo.FactMembresias fm
+    INNER JOIN dbo.DimFecha d ON d.sk_fecha = fm.sk_fecha_fin
+    GROUP BY d.anio, d.mes
 ),
 Renovadas AS
 (
-    SELECT
-        p.PeriodoInicio,
-        COUNT(DISTINCT fr.id_membresia_anterior_bk) AS MembresiasCohorteRenovadas
-    FROM Periodos p
-    INNER JOIN dbo.FactRenovaciones fr ON 1 = 1
-    INNER JOIN dbo.DimFecha dr ON dr.sk_fecha = fr.sk_fecha_renovacion
-    INNER JOIN dbo.FactMembresias anterior
-        ON anterior.id_membresia_bk = fr.id_membresia_anterior_bk
-    INNER JOIN dbo.DimFecha vencimiento
-        ON vencimiento.sk_fecha = anterior.sk_fecha_fin
-    WHERE vencimiento.fecha BETWEEN p.PeriodoInicio AND p.PeriodoFin
-      AND dr.fecha >= p.PeriodoInicio
-      AND dr.fecha <= DATEADD(DAY, 31, p.PeriodoFin)
-    GROUP BY p.PeriodoInicio
+    SELECT d.anio, d.mes, COUNT(DISTINCT fm.id_membresia_bk) AS n
+    FROM dbo.FactMembresias fm
+    INNER JOIN dbo.DimFecha d ON d.sk_fecha = fm.sk_fecha_fin
+    WHERE fm.id_membresia_nueva_bk IS NOT NULL
+    GROUP BY d.anio, d.mes
 )
 SELECT
-    p.anio AS Anio,
-    p.mes AS MesNumero,
-    p.nombre_mes AS Mes,
-    COALESCE(r.ClientesActivosInicio, 0) AS ClientesActivosInicio,
-    COALESCE(r.ClientesInicioActivosCierre, 0) AS ClientesInicioActivosCierre,
+    ci.anio AS Anio,
+    ci.mes AS MesNumero,
+    ci.nombre_mes AS Mes,
+    ci.sk_corte_cierre AS SkFechaCorteCierre,
+    COALESCE(ai.n, 0) AS ClientesActivosInicio,
+    COALESCE(re.n, 0) AS ClientesInicioActivosCierre,
     CASE
-        WHEN COALESCE(r.ClientesActivosInicio, 0) = 0 THEN NULL
-        ELSE r.ClientesInicioActivosCierre * 100.0 / r.ClientesActivosInicio
+        WHEN COALESCE(ai.n, 0) = 0 THEN NULL
+        ELSE re.n * 100.0 / ai.n
     END AS TasaRetencionClientes,
-    COALESCE(a.MembresiasActivas, 0) AS MembresiasActivas,
-    COALESCE(v.MembresiasVencenPeriodo, 0) AS MembresiasVencenPeriodo,
-    COALESCE(re.MembresiasCohorteRenovadas, 0) AS MembresiasCohorteRenovadas,
+    COALESCE(ac.n, 0) AS MembresiasActivas,
+    COALESCE(v.n, 0) AS MembresiasVencenPeriodo,
+    COALESCE(r.n, 0) AS MembresiasCohorteRenovadas,
     CASE
-        WHEN COALESCE(v.MembresiasVencenPeriodo, 0) = 0 THEN NULL
-        ELSE re.MembresiasCohorteRenovadas * 100.0 / v.MembresiasVencenPeriodo
+        WHEN COALESCE(v.n, 0) = 0 THEN NULL
+        ELSE r.n * 100.0 / v.n
     END AS TasaRenovacionMembresias
-FROM Periodos p
-LEFT JOIN Retencion r ON r.PeriodoInicio = p.PeriodoInicio
-LEFT JOIN Activas a ON a.PeriodoInicio = p.PeriodoInicio
-LEFT JOIN Vencen v ON v.PeriodoInicio = p.PeriodoInicio
-LEFT JOIN Renovadas re ON re.PeriodoInicio = p.PeriodoInicio;
+FROM CorteInicio ci
+LEFT JOIN ActivosInicio ai ON ai.anio = ci.anio AND ai.mes = ci.mes
+LEFT JOIN Retenidos re     ON re.anio = ci.anio AND re.mes = ci.mes
+LEFT JOIN Activas ac       ON ac.anio = ci.anio AND ac.mes = ci.mes
+LEFT JOIN Vencen v         ON v.anio = ci.anio AND v.mes = ci.mes
+LEFT JOIN Renovadas r      ON r.anio = ci.anio AND r.mes = ci.mes;
 GO
 
-/* 3. Comercial: ingresos, ventas, vencimientos y renovaciones por plan. */
+/* 3. Comercial: ingresos, ventas, vencimientos y renovaciones por tipo de plan. */
 CREATE OR ALTER VIEW dbo.DM_Comercial_Plan
 AS
 WITH Ingresos AS
@@ -221,14 +215,13 @@ Vencidas AS
 Renovadas AS
 (
     SELECT
-        DATEFROMPARTS(dr.anio, dr.mes, 1) AS PeriodoInicio,
-        anterior.sk_plan,
-        COUNT(DISTINCT fr.id_membresia_anterior_bk) AS MembresiasRenovadas
-    FROM dbo.FactRenovaciones fr
-    INNER JOIN dbo.DimFecha dr ON dr.sk_fecha = fr.sk_fecha_renovacion
-    INNER JOIN dbo.FactMembresias anterior
-        ON anterior.id_membresia_bk = fr.id_membresia_anterior_bk
-    GROUP BY DATEFROMPARTS(dr.anio, dr.mes, 1), anterior.sk_plan
+        DATEFROMPARTS(df.anio, df.mes, 1) AS PeriodoInicio,
+        fm.sk_plan,
+        COUNT(DISTINCT fm.id_membresia_bk) AS MembresiasRenovadas
+    FROM dbo.FactMembresias fm
+    INNER JOIN dbo.DimFecha df ON df.sk_fecha = fm.sk_fecha_fin
+    WHERE fm.id_membresia_nueva_bk IS NOT NULL
+    GROUP BY DATEFROMPARTS(df.anio, df.mes, 1), fm.sk_plan
 ),
 Claves AS
 (
@@ -256,60 +249,109 @@ SELECT
     END AS TasaRenovacionPorPlan
 FROM Claves c
 INNER JOIN dbo.DimPlan dp ON dp.sk_plan = c.sk_plan
-LEFT JOIN Ingresos i ON i.PeriodoInicio = c.PeriodoInicio AND i.sk_plan = c.sk_plan
-LEFT JOIN Vendidas v ON v.PeriodoInicio = c.PeriodoInicio AND v.sk_plan = c.sk_plan
-LEFT JOIN Vencidas x ON x.PeriodoInicio = c.PeriodoInicio AND x.sk_plan = c.sk_plan
+LEFT JOIN Ingresos i  ON i.PeriodoInicio = c.PeriodoInicio AND i.sk_plan = c.sk_plan
+LEFT JOIN Vendidas v  ON v.PeriodoInicio = c.PeriodoInicio AND v.sk_plan = c.sk_plan
+LEFT JOIN Vencidas x  ON x.PeriodoInicio = c.PeriodoInicio AND x.sk_plan = c.sk_plan
 LEFT JOIN Renovadas r ON r.PeriodoInicio = c.PeriodoInicio AND r.sk_plan = c.sk_plan;
 GO
 
-/* 4. Cobertura de avisos para membresías que vencen en los siguientes 7 días. */
-CREATE OR ALTER VIEW dbo.DM_Avisos_Cobertura
+/* 4. Comercial: promociones (ingresos, membresías vendidas y clientes captados). */
+CREATE OR ALTER VIEW dbo.DM_Comercial_Promociones
 AS
+WITH Ingresos AS
+(
+    SELECT
+        DATEFROMPARTS(df.anio, df.mes, 1) AS PeriodoInicio,
+        dp.sk_plan,
+        SUM(fv.monto_neto) AS IngresosPorPromocion,
+        COUNT(DISTINCT fv.id_pago_bk) AS VentasPorPromocion,
+        SUM(fv.descuento_aplicado) AS DescuentoOtorgado
+    FROM dbo.FactVentas fv
+    INNER JOIN dbo.DimFecha df ON df.sk_fecha = fv.sk_fecha_pago
+    INNER JOIN dbo.DimPlan dp ON dp.sk_plan = fv.sk_plan
+    WHERE dp.promocion <> 'SIN PROMOCION'
+    GROUP BY DATEFROMPARTS(df.anio, df.mes, 1), dp.sk_plan
+),
+Vendidas AS
+(
+    SELECT
+        DATEFROMPARTS(df.anio, df.mes, 1) AS PeriodoInicio,
+        fm.sk_plan,
+        COUNT(DISTINCT fm.id_membresia_bk) AS MembresiasVendidas,
+        COUNT(DISTINCT fm.sk_cliente) AS ClientesCaptados
+    FROM dbo.FactMembresias fm
+    INNER JOIN dbo.DimFecha df ON df.sk_fecha = fm.sk_fecha_inicio
+    INNER JOIN dbo.DimPlan dp ON dp.sk_plan = fm.sk_plan
+    WHERE dp.promocion <> 'SIN PROMOCION'
+    GROUP BY DATEFROMPARTS(df.anio, df.mes, 1), fm.sk_plan
+),
+Claves AS
+(
+    SELECT PeriodoInicio, sk_plan FROM Ingresos
+    UNION
+    SELECT PeriodoInicio, sk_plan FROM Vendidas
+)
 SELECT
-    corte.fecha AS FechaCorte,
-    COUNT(DISTINCT CASE
-        WHEN inicio.fecha <= corte.fecha
-         AND fin.fecha > corte.fecha
-         AND fin.fecha <= DATEADD(DAY, 7, corte.fecha)
-        THEN fm.id_membresia_bk END) AS MembresiasProximasVencer,
-    COUNT(DISTINCT CASE
-        WHEN av.estado = 'ENVIADO'
-         AND da.fecha = corte.fecha
-         AND fm.id_membresia_bk IS NOT NULL
-         AND inicio.fecha <= corte.fecha
-         AND fin.fecha > corte.fecha
-         AND fin.fecha <= DATEADD(DAY, 7, corte.fecha)
-        THEN av.id_aviso_bk END) AS AvisosRenovacionEmitidos,
-    CASE
-        WHEN COUNT(DISTINCT CASE
-            WHEN inicio.fecha <= corte.fecha
-             AND fin.fecha > corte.fecha
-             AND fin.fecha <= DATEADD(DAY, 7, corte.fecha)
-            THEN fm.id_membresia_bk END) = 0 THEN NULL
-        ELSE COUNT(DISTINCT CASE
-            WHEN av.estado = 'ENVIADO'
-             AND da.fecha = corte.fecha
-             AND fm.id_membresia_bk IS NOT NULL
-             AND inicio.fecha <= corte.fecha
-             AND fin.fecha > corte.fecha
-             AND fin.fecha <= DATEADD(DAY, 7, corte.fecha)
-            THEN av.id_aviso_bk END) * 100.0
-             / COUNT(DISTINCT CASE
-                 WHEN inicio.fecha <= corte.fecha
-                  AND fin.fecha > corte.fecha
-                  AND fin.fecha <= DATEADD(DAY, 7, corte.fecha)
-                 THEN fm.id_membresia_bk END)
-    END AS TasaCoberturaAvisos
-FROM dbo.DimFecha corte
-LEFT JOIN dbo.FactMembresias fm ON 1 = 1
-LEFT JOIN dbo.DimFecha inicio ON inicio.sk_fecha = fm.sk_fecha_inicio
-LEFT JOIN dbo.DimFecha fin ON fin.sk_fecha = fm.sk_fecha_fin
-LEFT JOIN dbo.FactAvisos av ON av.id_membresia_bk = fm.id_membresia_bk
-LEFT JOIN dbo.DimFecha da ON da.sk_fecha = av.sk_fecha_aviso
-GROUP BY corte.fecha;
+    YEAR(c.PeriodoInicio) AS Anio,
+    MONTH(c.PeriodoInicio) AS MesNumero,
+    DATENAME(MONTH, c.PeriodoInicio) AS Mes,
+    dp.tipo_plan AS TipoPlan,
+    dp.promocion AS Promocion,
+    COALESCE(i.IngresosPorPromocion, 0) AS IngresosPorPromocion,
+    COALESCE(i.VentasPorPromocion, 0) AS VentasPorPromocion,
+    COALESCE(i.DescuentoOtorgado, 0) AS DescuentoOtorgado,
+    COALESCE(v.MembresiasVendidas, 0) AS MembresiasVendidas,
+    COALESCE(v.ClientesCaptados, 0) AS ClientesCaptados
+FROM Claves c
+INNER JOIN dbo.DimPlan dp ON dp.sk_plan = c.sk_plan
+LEFT JOIN Ingresos i ON i.PeriodoInicio = c.PeriodoInicio AND i.sk_plan = c.sk_plan
+LEFT JOIN Vendidas v ON v.PeriodoInicio = c.PeriodoInicio AND v.sk_plan = c.sk_plan;
 GO
 
-/* 5. Recepción: reclamos registrados, resueltos, directos en mostrador y tiempos. */
+/* 5. Cobertura de avisos: membresías que vencen en los siguientes 7 días.
+      Los avisos emitidos son una cantidad del día (aditiva); la cobertura se
+      evalúa al corte. */
+CREATE OR ALTER VIEW dbo.DM_Avisos_Cobertura
+AS
+WITH Cortes AS
+(
+    SELECT DISTINCT fm.sk_fecha_corte, d.fecha AS FechaCorte
+    FROM dbo.FactMembresias fm
+    INNER JOIN dbo.DimFecha d ON d.sk_fecha = fm.sk_fecha_corte
+),
+Proximas AS
+(
+    SELECT
+        fm.sk_fecha_corte,
+        fm.id_membresia_bk,
+        fm.aviso_emitido
+    FROM dbo.FactMembresias fm
+    INNER JOIN dbo.DimFecha c ON c.sk_fecha = fm.sk_fecha_corte
+    INNER JOIN dbo.DimFecha f ON f.sk_fecha = fm.sk_fecha_fin
+    WHERE fm.estado_membresia = 'ACTIVA'
+      AND f.fecha >= c.fecha
+      AND f.fecha <= DATEADD(DAY, 7, c.fecha)
+)
+SELECT
+    c.FechaCorte,
+    COUNT(DISTINCT p.id_membresia_bk) AS MembresiasProximasVencer,
+    COUNT(DISTINCT CASE WHEN p.aviso_emitido = 1 THEN p.id_membresia_bk END) AS MembresiasConAviso,
+    (
+        SELECT COALESCE(SUM(fm2.avisos_emitidos_dia), 0)
+        FROM dbo.FactMembresias fm2
+        WHERE fm2.sk_fecha_corte = c.sk_fecha_corte
+    ) AS AvisosEmitidosDia,
+    CASE
+        WHEN COUNT(DISTINCT p.id_membresia_bk) = 0 THEN NULL
+        ELSE COUNT(DISTINCT CASE WHEN p.aviso_emitido = 1 THEN p.id_membresia_bk END) * 100.0
+             / COUNT(DISTINCT p.id_membresia_bk)
+    END AS TasaCoberturaAvisos
+FROM Cortes c
+LEFT JOIN Proximas p ON p.sk_fecha_corte = c.sk_fecha_corte
+GROUP BY c.FechaCorte, c.sk_fecha_corte;
+GO
+
+/* 6. Recepción: reclamos registrados, resueltos, directos en mostrador y tiempos. */
 CREATE OR ALTER VIEW dbo.DM_Atencion_Reclamos
 AS
 SELECT
@@ -331,229 +373,61 @@ SELECT
         ELSE COUNT(DISTINCT CASE WHEN fr.estado = 'RESUELTO' AND fr.resuelto_en_mostrador = 1 THEN fr.id_reclamo_bk END) * 100.0
              / COUNT(DISTINCT fr.id_reclamo_bk)
     END AS TasaResolucionDirectaMostrador,
+    COUNT(DISTINCT CASE WHEN fr.escalado = 1 THEN fr.id_reclamo_bk END) AS ReclamosEscalados,
     AVG(CASE WHEN fr.estado = 'RESUELTO' THEN fr.dias_resolucion END) AS PromedioDiasResolucion
 FROM dbo.FactReclamos fr
 INNER JOIN dbo.DimFecha df ON df.sk_fecha = fr.sk_fecha_reclamo
 GROUP BY df.anio, df.mes, df.nombre_mes, fr.categoria;
 GO
 
-/* 6. Entrenamiento: sesiones programadas y asistidas (tasa de asistencia).
-
-   El Excel empareja "sesiones asistidas" con "sesiones programadas"; por eso ambas
-   salen de la misma entidad (FactSesionesProgramadas, según su estado_sesion).
-   FactAsistencias sigue siendo el fact de check-ins del gimnasio (lo usa DM_Rutinas_Entrenador). */
-CREATE OR ALTER VIEW dbo.DM_Entrenamiento_Asistencia
+/* 7. Recepción: acciones de retención, no renovadas atendidas y recuperadas. */
+CREATE OR ALTER VIEW dbo.DM_Atencion_Retencion
 AS
+WITH MembresiaRenovada AS
+(
+    SELECT
+        fm.id_membresia_bk,
+        MAX(CASE WHEN fm.id_membresia_nueva_bk IS NOT NULL THEN 1 ELSE 0 END) AS Renovada
+    FROM dbo.FactMembresias fm
+    GROUP BY fm.id_membresia_bk
+)
 SELECT
     df.anio AS Anio,
     df.mes AS MesNumero,
     df.nombre_mes AS Mes,
-    c.sk_cliente,
-    c.id_cliente_bk,
-    c.nombre_completo AS Cliente,
-    COUNT(DISTINCT CASE WHEN sp.estado_sesion = 'ASISTIDA' THEN sp.id_sesion_bk END) AS SesionesAsistidasRegistradas,
-    COUNT(DISTINCT sp.id_sesion_bk) AS SesionesProgramadas,
-    CASE
-        WHEN COUNT(DISTINCT sp.id_sesion_bk) = 0 THEN NULL
-        ELSE COUNT(DISTINCT CASE WHEN sp.estado_sesion = 'ASISTIDA' THEN sp.id_sesion_bk END) * 100.0
-             / COUNT(DISTINCT sp.id_sesion_bk)
-    END AS TasaAsistencia
-FROM dbo.FactSesionesProgramadas sp
-INNER JOIN dbo.DimFecha df ON df.sk_fecha = sp.sk_fecha_programada
-INNER JOIN dbo.DimCliente c ON c.sk_cliente = sp.sk_cliente
-GROUP BY df.anio, df.mes, df.nombre_mes, c.sk_cliente, c.id_cliente_bk, c.nombre_completo;
-GO
-
-/* 7. Entrenamiento: progreso observable por cliente y objetivo. */
-CREATE OR ALTER VIEW dbo.DM_Entrenamiento_Progreso
-AS
-WITH UltimaEvaluacion AS
-(
-    SELECT
-        fe.sk_cliente,
-        fe.id_objetivo_bk,
-        fe.peso AS valor_actual,
-        df.fecha AS fecha_evaluacion,
-        ROW_NUMBER() OVER
-        (
-            PARTITION BY fe.sk_cliente, fe.id_objetivo_bk
-            ORDER BY df.fecha DESC, fe.id_evaluacion_bk DESC
-        ) AS rn
-    FROM dbo.FactEvaluaciones fe
-    INNER JOIN dbo.DimFecha df ON df.sk_fecha = fe.sk_fecha_evaluacion
-    WHERE fe.id_objetivo_bk IS NOT NULL
-),
-Calculo AS
-(
-    SELECT
-        fo.sk_cliente,
-        fo.id_objetivo_bk,
-        fo.tipo_objetivo,
-        fo.unidad_medida,
-        fo.valor_inicial,
-        fo.valor_objetivo,
-        ue.valor_actual,
-        ue.fecha_evaluacion,
-        CASE
-            WHEN fo.tipo_objetivo = 'REDUCCION_GRASA'
-                THEN fo.valor_inicial - ue.valor_actual
-            ELSE ue.valor_actual - fo.valor_inicial
-        END AS AvanceAlcanzado,
-        CASE
-            WHEN fo.tipo_objetivo = 'REDUCCION_GRASA'
-                THEN fo.valor_inicial - fo.valor_objetivo
-            ELSE fo.valor_objetivo - fo.valor_inicial
-        END AS AvanceEsperado
-    FROM dbo.FactObjetivos fo
-    INNER JOIN UltimaEvaluacion ue
-        ON ue.sk_cliente = fo.sk_cliente
-       AND ue.id_objetivo_bk = fo.id_objetivo_bk
-       AND ue.rn = 1
-)
-SELECT
-    c.sk_cliente,
-    dc.id_cliente_bk,
+    dc.sk_cliente AS SkCliente,
+    dc.id_cliente_bk AS IdClienteBk,
     dc.nombre_completo AS Cliente,
-    c.id_objetivo_bk,
-    c.tipo_objetivo,
-    c.unidad_medida,
-    c.valor_inicial AS ValorInicialObjetivo,
-    c.valor_actual AS ValorActualObjetivo,
-    c.valor_objetivo AS ValorObjetivo,
-    c.AvanceAlcanzado,
-    c.AvanceEsperado,
+    r.canal AS Canal,
+    COUNT(DISTINCT r.id_retencion_bk) AS AccionesRetencion,
+    COUNT(DISTINCT CASE WHEN ISNULL(mr.Renovada, 0) = 0 THEN r.id_membresia_bk END) AS MembresiasNoRenovadasAtendidas,
+    COUNT(DISTINCT CASE WHEN r.recuperada = 1 THEN r.id_membresia_bk END) AS MembresiasRecuperadas,
     CASE
-        WHEN c.AvanceEsperado IS NULL OR c.AvanceEsperado = 0 THEN NULL
-        ELSE c.AvanceAlcanzado * 100.0 / c.AvanceEsperado
-    END AS PorcentajeProgreso,
-    c.fecha_evaluacion AS FechaUltimaEvaluacion,
-    CASE
-        WHEN c.AvanceEsperado IS NULL OR c.AvanceEsperado = 0 THEN NULL
-        WHEN c.AvanceAlcanzado * 100.0 / c.AvanceEsperado < 100 THEN 1
-        ELSE 0
-    END AS TieneBajoProgreso
-FROM Calculo c
-INNER JOIN dbo.DimCliente dc ON dc.sk_cliente = c.sk_cliente;
+        WHEN COUNT(DISTINCT CASE WHEN ISNULL(mr.Renovada, 0) = 0 THEN r.id_membresia_bk END) = 0 THEN NULL
+        ELSE COUNT(DISTINCT CASE WHEN r.recuperada = 1 THEN r.id_membresia_bk END) * 100.0
+             / COUNT(DISTINCT CASE WHEN ISNULL(mr.Renovada, 0) = 0 THEN r.id_membresia_bk END)
+    END AS TasaExitoRetencion
+FROM dbo.FactRetenciones r
+INNER JOIN dbo.DimFecha df ON df.sk_fecha = r.sk_fecha_retencion
+INNER JOIN dbo.DimCliente dc ON dc.sk_cliente = r.sk_cliente
+LEFT JOIN MembresiaRenovada mr ON mr.id_membresia_bk = r.id_membresia_bk
+GROUP BY df.anio, df.mes, df.nombre_mes, dc.sk_cliente, dc.id_cliente_bk,
+         dc.nombre_completo, r.canal;
 GO
 
-/* 7.1. Entrenamiento: cumplimiento agregado de objetivos. */
-CREATE OR ALTER VIEW dbo.DM_Entrenamiento_Cumplimiento
-AS
-WITH ObjetivoPeriodo AS
-(
-    SELECT
-        fo.id_objetivo_bk,
-        fo.sk_cliente,
-        fo.tipo_objetivo,
-        df.anio AS Anio,
-        df.mes AS MesNumero,
-        df.nombre_mes AS Mes
-    FROM dbo.FactObjetivos fo
-    INNER JOIN dbo.DimFecha df ON df.sk_fecha = fo.sk_fecha_inicio
-),
-Evaluado AS
-(
-    SELECT
-        op.Anio, op.MesNumero, op.Mes, op.tipo_objetivo,
-        op.id_objetivo_bk, pr.PorcentajeProgreso
-    FROM ObjetivoPeriodo op
-    LEFT JOIN dbo.DM_Entrenamiento_Progreso pr
-        ON pr.id_objetivo_bk = op.id_objetivo_bk
-       AND pr.sk_cliente = op.sk_cliente
-)
-SELECT
-    Anio,
-    MesNumero,
-    Mes,
-    tipo_objetivo AS TipoObjetivo,
-    COUNT(*) AS ObjetivosRegistrados,
-    COUNT(CASE WHEN PorcentajeProgreso IS NOT NULL THEN 1 END) AS ObjetivosConProgreso,
-    COUNT(CASE WHEN PorcentajeProgreso >= 100 THEN 1 END) AS ObjetivosCumplidos,
-    CASE
-        WHEN COUNT(CASE WHEN PorcentajeProgreso IS NOT NULL THEN 1 END) = 0 THEN NULL
-        ELSE COUNT(CASE WHEN PorcentajeProgreso >= 100 THEN 1 END) * 100.0
-             / COUNT(CASE WHEN PorcentajeProgreso IS NOT NULL THEN 1 END)
-    END AS TasaCumplimientoObjetivos,
-    AVG(PorcentajeProgreso) AS PromedioPorcentajeProgreso
-FROM Evaluado
-GROUP BY Anio, MesNumero, Mes, tipo_objetivo;
-GO
-
-/* 7.2. Entrenamiento: evaluaciones programadas (exigibles, completadas, pendientes). */
-CREATE OR ALTER VIEW dbo.DM_Entrenamiento_Evaluaciones
-AS
-SELECT
-    df.anio AS Anio,
-    df.mes AS MesNumero,
-    df.nombre_mes AS Mes,
-    c.sk_cliente,
-    c.id_cliente_bk,
-    c.nombre_completo AS Cliente,
-    COUNT(DISTINCT ep.id_evaluacion_programada_bk) AS EvaluacionesProgramadas,
-    COUNT(DISTINCT CASE WHEN ep.estado_evaluacion = 'COMPLETADA' THEN ep.id_evaluacion_programada_bk END) AS EvaluacionesCompletadas,
-    COUNT(DISTINCT CASE
-        WHEN ep.estado_evaluacion IN ('PROGRAMADA', 'PENDIENTE')
-         AND df.fecha <= '2026-09-29'
-        THEN ep.id_evaluacion_programada_bk END) AS EvaluacionesPendientes,
-    CASE
-        WHEN COUNT(DISTINCT ep.id_evaluacion_programada_bk) = 0 THEN NULL
-        ELSE COUNT(DISTINCT CASE WHEN ep.estado_evaluacion = 'COMPLETADA' THEN ep.id_evaluacion_programada_bk END) * 100.0
-             / COUNT(DISTINCT ep.id_evaluacion_programada_bk)
-    END AS TasaCumplimientoEvaluaciones
-FROM dbo.FactEvaluacionesProgramadas ep
-INNER JOIN dbo.DimFecha df ON df.sk_fecha = ep.sk_fecha_programada
-INNER JOIN dbo.DimCliente c ON c.sk_cliente = ep.sk_cliente
-GROUP BY df.anio, df.mes, df.nombre_mes, c.sk_cliente, c.id_cliente_bk, c.nombre_completo;
-GO
-
-/* 8. Vistas compatibles con los nombres de la primera versión. */
-CREATE OR ALTER VIEW dbo.DM_Ventas_Gerencia
-AS
-SELECT
-    df.anio AS Anio,
-    df.trimestre AS Trimestre,
-    df.mes AS MesNumero,
-    df.nombre_mes AS Mes,
-    dp.tipo_plan AS Membresia,
-    SUM(fv.monto_neto) AS Total_Ingresos,
-    COUNT(DISTINCT fv.id_pago_bk) AS Cantidad_Ventas
-FROM dbo.FactVentas fv
-INNER JOIN dbo.DimFecha df ON fv.sk_fecha_pago = df.sk_fecha
-INNER JOIN dbo.DimPlan dp ON fv.sk_plan = dp.sk_plan
-GROUP BY df.anio, df.trimestre, df.mes, df.nombre_mes, dp.tipo_plan;
-GO
-
-CREATE OR ALTER VIEW dbo.DM_Rutinas_Entrenador
-AS
-SELECT
-    df.anio AS Anio,
-    df.mes AS MesNumero,
-    df.nombre_mes AS Mes,
-    dc.rango_etario AS Rango_Etario_Cliente,
-    de.nombre_completo AS Nombre_Entrenador,
-    dp.tipo_plan AS Tipo_Plan,
-    COUNT(DISTINCT fa.id_asistencia_bk) AS Total_Asistencias
-FROM dbo.FactAsistencias fa
-INNER JOIN dbo.DimFecha df ON fa.sk_fecha_asistencia = df.sk_fecha
-INNER JOIN dbo.DimCliente dc ON fa.sk_cliente = dc.sk_cliente
-LEFT JOIN dbo.DimEmpleado de ON fa.sk_empleado = de.sk_empleado
-LEFT JOIN dbo.DimPlan dp ON fa.sk_plan = dp.sk_plan
-GROUP BY df.anio, df.mes, df.nombre_mes, dc.rango_etario,
-         de.nombre_completo, dp.tipo_plan;
-GO
-
+/* 8. Recepción: atención registrada por segmento y categoría. */
 CREATE OR ALTER VIEW dbo.DM_Atencion_Recepcion
 AS
 SELECT
     df.anio AS Anio,
     df.mes AS MesNumero,
-    df.nombre_mes AS Periodo_Mes,
+    df.nombre_mes AS PeriodoMes,
     dc.sexo AS Sexo,
-    dc.rango_etario AS Rango_Etario,
+    dc.rango_etario AS RangoEtario,
     dc.nombre_completo AS Cliente,
-    fr.categoria AS Categoria_Atencion,
-    fr.estado AS Estado_Atencion,
-    COUNT(DISTINCT fr.id_reclamo_bk) AS Total_Atenciones
+    fr.categoria AS CategoriaAtencion,
+    fr.estado AS EstadoAtencion,
+    COUNT(DISTINCT fr.id_reclamo_bk) AS TotalAtenciones
 FROM dbo.FactReclamos fr
 INNER JOIN dbo.DimFecha df ON fr.sk_fecha_reclamo = df.sk_fecha
 INNER JOIN dbo.DimCliente dc ON fr.sk_cliente = dc.sk_cliente
@@ -561,100 +435,171 @@ GROUP BY df.anio, df.mes, df.nombre_mes, dc.sexo, dc.rango_etario,
          dc.nombre_completo, fr.categoria, fr.estado;
 GO
 
-CREATE OR ALTER VIEW dbo.DM_Atencion_Retencion
+/* 9. Entrenamiento: sesiones programadas (no canceladas) vs. asistidas. */
+CREATE OR ALTER VIEW dbo.DM_Entrenamiento_Asistencia
 AS
 SELECT
     df.anio AS Anio,
     df.mes AS MesNumero,
     df.nombre_mes AS Mes,
-    c.sk_cliente,
-    c.id_cliente_bk,
+    c.sk_cliente AS SkCliente,
+    c.id_cliente_bk AS IdClienteBk,
     c.nombre_completo AS Cliente,
-    r.canal AS Canal,
-    COUNT(DISTINCT r.id_retencion_bk) AS AccionesRetencion,
-    COUNT(DISTINCT CASE WHEN r.resultado = 'RETENIDO' THEN r.id_retencion_bk END) AS ClientesRetenidos,
+    COUNT(DISTINCT CASE WHEN se.estado_sesion <> 'CANCELADA' THEN se.id_sesion_bk END) AS SesionesProgramadas,
+    COUNT(DISTINCT CASE WHEN se.asistio = 1 THEN se.id_sesion_bk END) AS SesionesAsistidasRegistradas,
     CASE
-        WHEN COUNT(DISTINCT r.id_retencion_bk) = 0 THEN NULL
-        ELSE COUNT(DISTINCT CASE WHEN r.resultado = 'RETENIDO' THEN r.id_retencion_bk END) * 100.0
-             / COUNT(DISTINCT r.id_retencion_bk)
-    END AS TasaExitoRetencion
-FROM dbo.FactRetenciones r
-INNER JOIN dbo.DimFecha df ON df.sk_fecha = r.sk_fecha_retencion
-INNER JOIN dbo.DimCliente c ON c.sk_cliente = r.sk_cliente
-GROUP BY df.anio, df.mes, df.nombre_mes, c.sk_cliente, c.id_cliente_bk, c.nombre_completo, r.canal;
+        WHEN COUNT(DISTINCT CASE WHEN se.estado_sesion <> 'CANCELADA' THEN se.id_sesion_bk END) = 0 THEN NULL
+        ELSE COUNT(DISTINCT CASE WHEN se.asistio = 1 THEN se.id_sesion_bk END) * 100.0
+             / COUNT(DISTINCT CASE WHEN se.estado_sesion <> 'CANCELADA' THEN se.id_sesion_bk END)
+    END AS TasaAsistencia
+FROM dbo.FactSesionesEntrenamiento se
+INNER JOIN dbo.DimFecha df ON df.sk_fecha = se.sk_fecha_programada
+INNER JOIN dbo.DimCliente c ON c.sk_cliente = se.sk_cliente
+GROUP BY df.anio, df.mes, df.nombre_mes, c.sk_cliente, c.id_cliente_bk, c.nombre_completo;
 GO
 
-/* ------------------- Métricas de promoción (data mart comercial) -------------------
-   Se alimentan de DimPlan.promocion (planes promocionales de periodo corto del
-   catálogo). Todas consideran solo promociones reales (promocion <> 'SIN PROMOCION'). */
-
-/* 9. Comercial: ingresos, ventas y descuento otorgado por promoción.
-   Dimensiones: Fecha, Plan. */
-CREATE OR ALTER VIEW dbo.DM_Promociones_Ventas
+/* 10. Entrenamiento: accesos reales al gimnasio (no equivalen a sesiones). */
+CREATE OR ALTER VIEW dbo.DM_Entrenamiento_Accesos
 AS
 SELECT
     df.anio AS Anio,
     df.mes AS MesNumero,
     df.nombre_mes AS Mes,
+    c.sk_cliente AS SkCliente,
+    c.id_cliente_bk AS IdClienteBk,
+    c.nombre_completo AS Cliente,
+    COUNT(DISTINCT fa.id_asistencia_bk) AS AccesosRegistrados,
+    COUNT(DISTINCT fa.sk_fecha_asistencia) AS DiasConAcceso
+FROM dbo.FactAsistencias fa
+INNER JOIN dbo.DimFecha df ON df.sk_fecha = fa.sk_fecha_asistencia
+INNER JOIN dbo.DimCliente c ON c.sk_cliente = fa.sk_cliente
+WHERE fa.es_acceso_valido = 1
+GROUP BY df.anio, df.mes, df.nombre_mes, c.sk_cliente, c.id_cliente_bk, c.nombre_completo;
+GO
+
+/* 11. Entrenamiento: progreso por cliente y objetivo, al último corte. */
+CREATE OR ALTER VIEW dbo.DM_Entrenamiento_Progreso
+AS
+WITH UltimoCorte AS
+(
+    SELECT
+        fs.*,
+        ROW_NUMBER() OVER (PARTITION BY fs.id_objetivo_bk ORDER BY fs.sk_fecha_corte DESC) AS rn
+    FROM dbo.FactSeguimientoFisico fs
+)
+SELECT
+    u.sk_cliente AS SkCliente,
+    dc.id_cliente_bk AS IdClienteBk,
+    dc.nombre_completo AS Cliente,
+    u.id_objetivo_bk AS IdObjetivoBk,
+    dcorte.fecha AS FechaCorte,
+    u.tipo_objetivo AS TipoObjetivo,
+    u.unidad_medida AS UnidadMedida,
+    u.estado_objetivo AS EstadoObjetivo,
+    u.valor_inicial AS ValorInicialObjetivo,
+    u.valor_actual AS ValorActualObjetivo,
+    u.valor_esperado AS ValorEsperado,
+    u.avance_alcanzado AS AvanceAlcanzado,
+    u.avance_esperado AS AvanceEsperado,
+    u.porcentaje_progreso AS PorcentajeProgreso,
+    CASE
+        WHEN u.porcentaje_progreso IS NULL THEN NULL
+        WHEN u.porcentaje_progreso < 100 THEN 1
+        ELSE 0
+    END AS TieneBajoProgreso,
+    u.evaluacion_exigible AS EvaluacionExigible,
+    u.evaluacion_completada AS EvaluacionCompletada,
+    u.evaluacion_pendiente AS EvaluacionPendiente
+FROM UltimoCorte u
+INNER JOIN dbo.DimCliente dc ON dc.sk_cliente = u.sk_cliente
+INNER JOIN dbo.DimFecha dcorte ON dcorte.sk_fecha = u.sk_fecha_corte
+WHERE u.rn = 1;
+GO
+
+/* 12. Entrenamiento: clientes con al menos un objetivo por debajo del 100%. */
+CREATE OR ALTER VIEW dbo.DM_Entrenamiento_BajoProgreso
+AS
+SELECT
+    p.SkCliente AS SkCliente,
+    p.IdClienteBk AS IdClienteBk,
+    p.Cliente,
+    MAX(p.FechaCorte) AS FechaCorte,
+    COUNT(*) AS ObjetivosEvaluados,
+    SUM(CASE WHEN p.PorcentajeProgreso < 100 THEN 1 ELSE 0 END) AS ObjetivosBajoProgreso
+FROM dbo.DM_Entrenamiento_Progreso p
+WHERE p.PorcentajeProgreso IS NOT NULL
+GROUP BY p.SkCliente, p.IdClienteBk, p.Cliente
+HAVING SUM(CASE WHEN p.PorcentajeProgreso < 100 THEN 1 ELSE 0 END) > 0;
+GO
+
+/* 13. Entrenamiento: evaluaciones exigibles, completadas y pendientes al corte. */
+CREATE OR ALTER VIEW dbo.DM_Entrenamiento_Evaluaciones
+AS
+WITH CortesMes AS
+(
+    SELECT
+        d.anio,
+        d.mes,
+        MAX(d.nombre_mes) AS nombre_mes,
+        MAX(fs.sk_fecha_corte) AS sk_fecha_corte
+    FROM dbo.FactSeguimientoFisico fs
+    INNER JOIN dbo.DimFecha d ON d.sk_fecha = fs.sk_fecha_corte
+    GROUP BY d.anio, d.mes
+)
+SELECT
+    cm.anio AS Anio,
+    cm.mes AS MesNumero,
+    cm.nombre_mes AS Mes,
+    c.sk_cliente AS SkCliente,
+    c.id_cliente_bk AS IdClienteBk,
+    c.nombre_completo AS Cliente,
+    COUNT(DISTINCT CASE WHEN fs.evaluacion_exigible = 1 THEN fs.id_objetivo_bk END) AS EvaluacionesExigibles,
+    COUNT(DISTINCT CASE WHEN fs.evaluacion_completada = 1 THEN fs.id_objetivo_bk END) AS EvaluacionesCompletadas,
+    COUNT(DISTINCT CASE WHEN fs.evaluacion_pendiente = 1 THEN fs.id_objetivo_bk END) AS EvaluacionesPendientes,
+    CASE
+        WHEN COUNT(DISTINCT CASE WHEN fs.evaluacion_exigible = 1 THEN fs.id_objetivo_bk END) = 0 THEN NULL
+        ELSE COUNT(DISTINCT CASE WHEN fs.evaluacion_completada = 1 THEN fs.id_objetivo_bk END) * 100.0
+             / COUNT(DISTINCT CASE WHEN fs.evaluacion_exigible = 1 THEN fs.id_objetivo_bk END)
+    END AS TasaCumplimientoEvaluaciones
+FROM CortesMes cm
+INNER JOIN dbo.FactSeguimientoFisico fs ON fs.sk_fecha_corte = cm.sk_fecha_corte
+INNER JOIN dbo.DimCliente c ON c.sk_cliente = fs.sk_cliente
+GROUP BY cm.anio, cm.mes, cm.nombre_mes, c.sk_cliente, c.id_cliente_bk, c.nombre_completo;
+GO
+
+/* 14. Entrenamiento: sesiones asistidas por entrenador, segmento y plan. */
+CREATE OR ALTER VIEW dbo.DM_Rutinas_Entrenador
+AS
+SELECT
+    df.anio AS Anio,
+    df.mes AS MesNumero,
+    df.nombre_mes AS Mes,
+    dc.rango_etario AS RangoEtarioCliente,
+    de.codigo_empleado AS CodigoEmpleado,
+    de.nombre_completo AS NombreEntrenador,
+    de.area AS Area,
     dp.tipo_plan AS TipoPlan,
-    dp.promocion AS Promocion,
-    SUM(fv.monto_neto) AS IngresosPorPromocion,
-    COUNT(DISTINCT fv.id_pago_bk) AS VentasPorPromocion,
-    SUM(fv.descuento_aplicado) AS DescuentoOtorgado
-FROM dbo.FactVentas fv
-INNER JOIN dbo.DimFecha df ON df.sk_fecha = fv.sk_fecha_pago
-INNER JOIN dbo.DimPlan dp ON dp.sk_plan = fv.sk_plan
-WHERE dp.promocion <> 'SIN PROMOCION'
-GROUP BY df.anio, df.mes, df.nombre_mes, dp.tipo_plan, dp.promocion;
-GO
-
-/* 10. Comercial: membresías vendidas y renovadas por promoción y empleado.
-   Dimensiones: Fecha, Empleado, Plan. */
-CREATE OR ALTER VIEW dbo.DM_Promociones_Membresias
-AS
-SELECT
-    df.anio AS Anio,
-    df.mes AS MesNumero,
-    df.nombre_mes AS Mes,
-    dp.promocion AS Promocion,
-    de.nombre_completo AS Empleado,
-    COUNT(DISTINCT fm.id_membresia_bk) AS MembresiasVendidas,
-    COUNT(DISTINCT CASE WHEN fm.es_renovacion = 1 THEN fm.id_membresia_bk END) AS MembresiasRenovadas
-FROM dbo.FactMembresias fm
-INNER JOIN dbo.DimFecha df ON df.sk_fecha = fm.sk_fecha_inicio
-INNER JOIN dbo.DimPlan dp ON dp.sk_plan = fm.sk_plan
-LEFT JOIN dbo.DimEmpleado de ON de.sk_empleado = fm.sk_empleado
-WHERE dp.promocion <> 'SIN PROMOCION'
-GROUP BY df.anio, df.mes, df.nombre_mes, dp.promocion, de.nombre_completo;
-GO
-
-/* 11. Comercial: clientes captados por promoción y segmento (sexo/rango etario).
-   Dimensiones: Fecha, Cliente, Plan. */
-CREATE OR ALTER VIEW dbo.DM_Promociones_Clientes
-AS
-SELECT
-    df.anio AS Anio,
-    df.mes AS MesNumero,
-    df.nombre_mes AS Mes,
-    dp.promocion AS Promocion,
-    dc.sexo AS Sexo,
-    dc.rango_etario AS RangoEtario,
-    COUNT(DISTINCT fm.sk_cliente) AS ClientesCaptados
-FROM dbo.FactMembresias fm
-INNER JOIN dbo.DimFecha df ON df.sk_fecha = fm.sk_fecha_inicio
-INNER JOIN dbo.DimPlan dp ON dp.sk_plan = fm.sk_plan
-INNER JOIN dbo.DimCliente dc ON dc.sk_cliente = fm.sk_cliente
-WHERE dp.promocion <> 'SIN PROMOCION'
-GROUP BY df.anio, df.mes, df.nombre_mes, dp.promocion, dc.sexo, dc.rango_etario;
+    COUNT(DISTINCT se.id_sesion_bk) AS TotalAsistencias
+FROM dbo.FactSesionesEntrenamiento se
+INNER JOIN dbo.DimFecha df ON se.sk_fecha_programada = df.sk_fecha
+INNER JOIN dbo.DimCliente dc ON se.sk_cliente = dc.sk_cliente
+LEFT JOIN dbo.DimEmpleado de ON se.sk_empleado = de.sk_empleado
+LEFT JOIN dbo.DimPlan dp ON se.sk_plan = dp.sk_plan
+WHERE se.asistio = 1
+GROUP BY df.anio, df.mes, df.nombre_mes, dc.rango_etario,
+         de.codigo_empleado, de.nombre_completo, de.area, dp.tipo_plan;
 GO
 
 /* Pruebas rápidas de las salidas SQL antes de conectar Power BI. */
 SELECT TOP (20) * FROM dbo.DM_Gerencia_Ingresos ORDER BY Anio, MesNumero;
 SELECT TOP (20) * FROM dbo.DM_Gerencia_Membresias ORDER BY Anio, MesNumero;
 SELECT TOP (20) * FROM dbo.DM_Comercial_Plan ORDER BY Anio, MesNumero, TipoPlan;
+SELECT TOP (20) * FROM dbo.DM_Comercial_Promociones ORDER BY Anio, MesNumero, Promocion;
+SELECT TOP (20) * FROM dbo.DM_Avisos_Cobertura ORDER BY FechaCorte;
 SELECT TOP (20) * FROM dbo.DM_Atencion_Reclamos ORDER BY Anio, MesNumero;
-SELECT TOP (20) * FROM dbo.DM_Entrenamiento_Progreso ORDER BY id_cliente_bk, id_objetivo_bk;
-SELECT TOP (20) * FROM dbo.DM_Promociones_Ventas ORDER BY Anio, MesNumero, Promocion;
-SELECT TOP (20) * FROM dbo.DM_Promociones_Membresias ORDER BY Anio, MesNumero, Promocion;
-SELECT TOP (20) * FROM dbo.DM_Promociones_Clientes ORDER BY Anio, MesNumero, Promocion;
+SELECT TOP (20) * FROM dbo.DM_Atencion_Retencion ORDER BY Anio, MesNumero;
+SELECT TOP (20) * FROM dbo.DM_Entrenamiento_Accesos ORDER BY Anio, MesNumero;
+SELECT TOP (20) * FROM dbo.DM_Entrenamiento_Progreso ORDER BY IdClienteBk, IdObjetivoBk;
+SELECT TOP (20) * FROM dbo.DM_Entrenamiento_BajoProgreso ORDER BY ObjetivosBajoProgreso DESC;
+SELECT TOP (20) * FROM dbo.DM_Entrenamiento_Evaluaciones ORDER BY Anio, MesNumero;
 GO

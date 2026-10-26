@@ -254,6 +254,7 @@ GO
 CREATE TABLE [dbo].[DimEmpleado](
     [sk_empleado] int IDENTITY(1,1) NOT NULL,
     [id_empleado_bk] int NULL,
+    [codigo_empleado] varchar(20) NULL,
     [dni] varchar(20) NULL,
     [nombre_completo] varchar(250) NULL,
     [cargo] varchar(60) NULL,
@@ -331,6 +332,7 @@ GO
 CREATE TABLE [dbo].[FactObjetivos](
     [id_objetivo_bk] int NULL,
     [sk_fecha_inicio] int NULL,
+    [sk_fecha_meta] int NULL,
     [sk_cliente] int NULL,
     [tipo_objetivo] varchar(60) NULL,
     [valor_inicial] decimal(10,2) NULL,
@@ -359,8 +361,11 @@ CREATE TABLE [dbo].[FactReclamos](
     [categoria] varchar(60) NULL,
     [estado] varchar(30) NULL,
     [fecha_resolucion] datetime2(7) NULL,
+    [fecha_cierre] datetime2(7) NULL,
     [dias_resolucion] int NULL,
-    [resuelto_en_mostrador] bit NULL
+    [resuelto_en_mostrador] bit NULL,
+    [escalado] bit NULL,
+    [area_responsable] varchar(60) NULL
 )
 GO
 CREATE TABLE [dbo].[FactSesionesProgramadas](
@@ -372,7 +377,9 @@ CREATE TABLE [dbo].[FactSesionesProgramadas](
     [tipo_sesion] varchar(40) NULL,
     [hora_programada] int NULL,
     [estado_sesion] varchar(30) NULL,
-    [duracion_minutos] int NULL
+    [duracion_minutos] int NULL,
+    [fecha_cancelacion] datetime2(7) NULL,
+    [motivo_cancelacion] varchar(60) NULL
 )
 GO
 CREATE TABLE [dbo].[FactEvaluacionesProgramadas](
@@ -18078,6 +18085,47 @@ INSERT INTO [dbo].[FactVentas] ([id_pago_bk], [sk_fecha_pago], [sk_cliente], [sk
 (9004, 20260822, 44, 9, 4, 9004, 39.90, 0.00, 39.90, N'EFECTIVO'),
 (9005, 20260729, 55, 8, 5, 9005, 9.90, 0.00, 19.90, N'TRANSFERENCIA'),
 (9006, 20260622, 66, 10, 2, 9006, 69.90, 15.00, 84.90, N'YAPE');
+GO
+
+/* ----------------------------------------------------------------------------
+   Columnas incorporadas por la reestructuración a 7 hechos (AEQUITECTURA BI v2).
+   Se pueblan de forma determinista aquí para no reescribir los INSERT del dump.
+   ---------------------------------------------------------------------------- */
+UPDATE dbo.DimEmpleado
+   SET codigo_empleado = 'EMP-' + RIGHT('000' + CAST(id_empleado_bk AS VARCHAR(6)), 3)
+ WHERE codigo_empleado IS NULL AND id_empleado_bk IS NOT NULL;
+GO
+
+/* Fecha meta del objetivo: 90 días después del inicio (regla temporal del ETL). */
+UPDATE dbo.FactObjetivos
+   SET sk_fecha_meta = CONVERT(INT, CONVERT(CHAR(8),
+           DATEADD(DAY, 90, TRY_CONVERT(DATE, CONVERT(CHAR(8), sk_fecha_inicio), 112)), 112))
+ WHERE sk_fecha_meta IS NULL AND sk_fecha_inicio IS NOT NULL;
+GO
+
+/* Hitos del reclamo: cierre, escalamiento y área responsable. */
+UPDATE dbo.FactReclamos
+   SET fecha_cierre = fecha_resolucion
+ WHERE fecha_cierre IS NULL AND fecha_resolucion IS NOT NULL;
+
+UPDATE dbo.FactReclamos
+   SET escalado = CASE WHEN UPPER(LTRIM(RTRIM(estado))) LIKE 'PEND%' THEN 1 ELSE 0 END
+ WHERE escalado IS NULL;
+
+UPDATE dbo.FactReclamos
+   SET area_responsable = CASE
+           WHEN UPPER(LTRIM(RTRIM(categoria))) LIKE '%COBR%' THEN 'ADMINISTRACION'
+           ELSE 'RECEPCION'
+       END
+ WHERE area_responsable IS NULL;
+GO
+
+/* Cancelación de sesiones: la fecha del evento es la fecha programada. */
+UPDATE dbo.FactSesionesProgramadas
+   SET fecha_cancelacion = TRY_CONVERT(DATE, CONVERT(CHAR(8), sk_fecha_programada), 112),
+       motivo_cancelacion = 'CANCELADA POR EL CLIENTE'
+ WHERE fecha_cancelacion IS NULL
+   AND UPPER(LTRIM(RTRIM(estado_sesion))) LIKE 'CANCEL%';
 GO
 
 PRINT 'Base ' + DB_NAME() + ' creada con datos sin depurar.';

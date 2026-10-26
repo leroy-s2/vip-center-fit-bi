@@ -22,20 +22,17 @@ public sealed class ActoresController(KpiRepository repo) : ControllerBase
                     actor = "gerencia",
                     titulo = "Crecimiento y retención",
                     ingresos = await repo.GerenciaIngresosAsync(desde, hasta, ct),
-                    membresias = await repo.GerenciaMembresiasAsync(desde, hasta, ct),
-                    ventas = await repo.VentasGerenciaAsync(desde, hasta, null, ct)
+                    membresias = await repo.GerenciaMembresiasAsync(desde, hasta, ct)
                 });
 
             case "comercial":
                 return Ok(new
                 {
                     actor = "comercial",
-                    titulo = "Planes y promociones",
+                    titulo = "Planes, promociones y avisos",
                     planes = await repo.ComercialPlanAsync(desde, hasta, null, ct),
-                    avisosCobertura = await repo.AvisosCoberturaAsync(ct),
-                    promocionesVentas = await repo.ComercialPromocionesVentasAsync(desde, hasta, null, ct),
-                    promocionesMembresias = await repo.ComercialPromocionesMembresiasAsync(desde, hasta, null, ct),
-                    promocionesClientes = await repo.ComercialPromocionesClientesAsync(desde, hasta, null, ct)
+                    promociones = await repo.ComercialPromocionesAsync(desde, hasta, null, ct),
+                    avisosCobertura = await repo.AvisosCoberturaAsync(ct)
                 });
 
             case "recepcion":
@@ -54,10 +51,11 @@ public sealed class ActoresController(KpiRepository repo) : ControllerBase
                     actor = "entrenador",
                     titulo = "Entrenamiento y progreso",
                     asistencia = await repo.EntrenamientoAsistenciaAsync(desde, hasta, null, ct),
+                    accesos = await repo.EntrenamientoAccesosAsync(desde, hasta, null, ct),
                     progreso = await repo.EntrenamientoProgresoAsync(null, null, ct),
-                    cumplimiento = await repo.EntrenamientoCumplimientoAsync(desde, hasta, null, ct),
-                    rutinas = await repo.RutinasEntrenadorAsync(desde, hasta, null, ct),
-                    evaluaciones = await repo.EntrenamientoEvaluacionesAsync(desde, hasta, null, ct)
+                    bajoProgreso = await repo.EntrenamientoBajoProgresoAsync(null, ct),
+                    evaluaciones = await repo.EntrenamientoEvaluacionesAsync(desde, hasta, null, ct),
+                    rutinas = await repo.RutinasEntrenadorAsync(desde, hasta, null, ct)
                 });
 
             default:

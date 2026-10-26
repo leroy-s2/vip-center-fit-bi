@@ -1,5 +1,10 @@
 # Cumplimiento del modelo frente a `OFICIAL1.xlsx`
 
+> ⚠️ **Documento histórico (modelo de 11 hechos).** El modelo vigente corresponde a
+> `AEQUITECTURA BI (2).xlsx` (7 hechos) y su trazabilidad está en
+> [`CUMPLIMIENTO_V2.md`](CUMPLIMIENTO_V2.md). Se conserva este archivo sólo como referencia de la
+> versión anterior.
+
 Verificación del Excel oficial (métricas, indicadores y KPIs por actor) contra el Data
 Warehouse (3 data marts en constelación) y las APIs. Leyenda: ✅ cubierto · ⚠️ parcial ·
 ❌ falta (requiere modelar un dato que hoy no existe en la fuente).

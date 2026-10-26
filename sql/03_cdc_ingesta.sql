@@ -220,11 +220,11 @@ BEGIN
             INSERT INTO stg.stg_empleados
             (
                 CargaID, OperacionCDC, StartLSN, SeqVal,
-                sk_empleado_origen, id_empleado_bk, dni, nombre_completo, cargo, area
+                sk_empleado_origen, id_empleado_bk, codigo_empleado, dni, nombre_completo, cargo, area
             )
             SELECT
                 @CargaID, __$operation, __$start_lsn, __$seqval,
-                sk_empleado, id_empleado_bk, dni, nombre_completo, cargo, area
+                sk_empleado, id_empleado_bk, codigo_empleado, dni, nombre_completo, cargo, area
             FROM BI_VIP_CENTER_FIT_DW_ORIGEN.cdc.fn_cdc_get_all_changes_dbo_DimEmpleado(@fEmp, @HastaLSN, 'all')
             WHERE __$operation IN (1, 2, 4);
             SET @Filas += @@ROWCOUNT;
@@ -346,13 +346,13 @@ BEGIN
             INSERT INTO stg.stg_entrenamiento
             (
                 CargaID, OperacionCDC, StartLSN, SeqVal, EntidadOrigen,
-                id_objetivo_bk, sk_fecha_inicio_origen, sk_cliente_origen,
+                id_objetivo_bk, sk_fecha_inicio_origen, sk_fecha_meta_origen, sk_cliente_origen,
                 tipo_objetivo, valor_inicial, valor_objetivo, unidad_medida,
                 estado_objetivo
             )
             SELECT
                 @CargaID, __$operation, __$start_lsn, __$seqval, 'OBJETIVO',
-                id_objetivo_bk, sk_fecha_inicio, sk_cliente,
+                id_objetivo_bk, sk_fecha_inicio, sk_fecha_meta, sk_cliente,
                 tipo_objetivo, valor_inicial, valor_objetivo, unidad_medida,
                 estado
             FROM BI_VIP_CENTER_FIT_DW_ORIGEN.cdc.fn_cdc_get_all_changes_dbo_FactObjetivos(@fObj, @HastaLSN, 'all')
@@ -385,14 +385,14 @@ BEGIN
             (
                 CargaID, OperacionCDC, StartLSN, SeqVal, EntidadOrigen,
                 id_reclamo_bk, sk_fecha_reclamo_origen, sk_cliente_origen,
-                sk_empleado_origen, categoria, estado, fecha_resolucion,
-                dias_resolucion, resuelto_en_mostrador
+                sk_empleado_origen, categoria, estado, fecha_resolucion, fecha_cierre,
+                dias_resolucion, resuelto_en_mostrador, escalado, area_responsable
             )
             SELECT
                 @CargaID, __$operation, __$start_lsn, __$seqval, 'RECLAMO',
                 id_reclamo_bk, sk_fecha_reclamo, sk_cliente,
-                sk_empleado, categoria, estado, fecha_resolucion,
-                dias_resolucion, resuelto_en_mostrador
+                sk_empleado, categoria, estado, fecha_resolucion, fecha_cierre,
+                dias_resolucion, resuelto_en_mostrador, escalado, area_responsable
             FROM BI_VIP_CENTER_FIT_DW_ORIGEN.cdc.fn_cdc_get_all_changes_dbo_FactReclamos(@fRec, @HastaLSN, 'all')
             WHERE __$operation IN (1, 2, 4);
             SET @Filas += @@ROWCOUNT;
@@ -405,13 +405,13 @@ BEGIN
                 CargaID, OperacionCDC, StartLSN, SeqVal, EntidadOrigen,
                 id_sesion_bk, sk_fecha_programada_origen, sk_cliente_origen,
                 sk_plan_origen, sk_empleado_origen, tipo_sesion, hora_programada,
-                estado_sesion, duracion_minutos
+                estado_sesion, duracion_minutos, fecha_cancelacion, motivo_cancelacion
             )
             SELECT
                 @CargaID, __$operation, __$start_lsn, __$seqval, 'SESION_PROGRAMADA',
                 id_sesion_bk, sk_fecha_programada, sk_cliente,
                 sk_plan, sk_empleado, tipo_sesion, hora_programada,
-                estado_sesion, duracion_minutos
+                estado_sesion, duracion_minutos, fecha_cancelacion, motivo_cancelacion
             FROM BI_VIP_CENTER_FIT_DW_ORIGEN.cdc.fn_cdc_get_all_changes_dbo_FactSesionesProgramadas(@fSes, @HastaLSN, 'all')
             WHERE __$operation IN (1, 2, 4);
             SET @Filas += @@ROWCOUNT;
